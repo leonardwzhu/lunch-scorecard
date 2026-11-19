@@ -30,15 +30,15 @@
   function shift(s, n) { const d = parseYmd(s); d.setDate(d.getDate() + n); return ymd(d); }
   function pretty(s, opts) { return parseYmd(s).toLocaleDateString(undefined, opts || { weekday: "long", month: "short", day: "numeric" }); }
 
-  // ---------- this browser's voter identity (no login) ----------
+  // ---------- who's voting: the signed-in account ----------
   function store(key, val) {
     try { if (val === undefined) return localStorage.getItem(key); localStorage.setItem(key, val); } catch (e) { return null; }
   }
-  let voterId = store("lunch.voterId");
-  if (!voterId) {
-    voterId = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now().toString(36));
-    store("lunch.voterId", voterId);
-  }
+  // Before sign-in existed, each browser voted under its own random id. On first sign-in here,
+  // that id's ratings are moved into the account (claim_voter_id in supabase/004_accounts.sql).
+  const legacyId = store("lunch.voterId");
+  let voterId = null;   // the signed-in account's id, or null when signed out
+  let account = null;   // the signed-in user (email, saved name)
   $("voterName").value = store("lunch.name") || "";
 
   const today = ymd(new Date());
@@ -55,6 +55,7 @@
     votes: [],   // rows from the votes table
     absences: [],   // who was out of the office, per day
     reactions: [],  // up/down votes on people's ratings
+    counts: {},     // day -> { ratings, outs }, visible even before you've rated
     extras: true,   // false until the 002 SQL has been run in Supabase
     loaded: false, pick: 0, dirty: false, editing: false, confirmingAway: false,
   };
@@ -86,7 +87,7 @@
       b.classList.toggle("on", i <= v);
       b.firstChild.classList.toggle("off", i > v);
       b.setAttribute("aria-checked", String(i === state.pick));
-      b.disabled = !state.sb || !canVoteDay() || !!myAbsence(state.day);
+      b.disabled = !state.sb || !voterId || !canVoteDay() || !!myAbsence(state.day);
     }
     const label = $("starLabel");
     label.textContent = !canVoteDay() ? "Voting is closed for this day" : (v ? LABELS[v] : "Tap a cookie");
@@ -98,7 +99,7 @@
     const mv = myVote(state.day);
     const name = $("voterName").value.trim();
     const changed = state.pick && (!mv || mv.stars !== state.pick || (mv.comment || "") !== $("comment").value.trim() || (mv.voter_name || "") !== name);
-    $("submitVote").disabled = !state.sb || !canVoteDay() || !changed;
+    $("submitVote").disabled = !state.sb || !voterId || !canVoteDay() || !changed;
     $("submitVote").textContent = mv ? "Update rating" : "Submit rating";
   }
   $("comment").addEventListener("input", () => { state.dirty = true; updateSubmit(); });
@@ -219,7 +220,7 @@
   let saving = false;
   $("voteForm").addEventListener("submit", async (e) => {
     e.preventDefault();
-    if (saving || !state.pick || !state.sb || !canVoteDay()) return;
+    if (saving || !state.pick || !state.sb || !voterId || !canVoteDay()) return;
     saving = true; $("submitVote").disabled = true;
     const status = $("voteStatus"); status.className = "status"; status.textContent = "Saving…";
     const row = {
@@ -237,14 +238,16 @@
     }
     mergeVote(row); state.dirty = false;
     status.className = "status ok"; status.textContent = "Saved. Thanks for rating.";
+    saveNameToAccount(row.voter_name);
     render(); updateSubmit();
+    loadAll(); // everyone else's ratings for this day are visible now
   });
 
   // ---------- "I wasn't in the office" ----------
   $("awayBtn").addEventListener("click", () => { state.confirmingAway = true; renderAway(); $("awayYes").focus(); });
   $("awayNo").addEventListener("click", () => { state.confirmingAway = false; renderAway(); });
   $("awayYes").addEventListener("click", async () => {
-    if (!state.sb || myVote(state.day) || myAbsence(state.day)) return;
+    if (!state.sb || !voterId || myVote(state.day) || myAbsence(state.day)) return;
     $("awayYes").disabled = true;
     const row = { day: state.day, voter_id: voterId, voter_name: $("voterName").value.trim().slice(0, 40) };
     const { error } = await state.sb.from("absences").insert(row);
@@ -254,14 +257,15 @@
     }
     mergeRow(state.absences, row, ["day", "voter_id"]);
     state.confirmingAway = false; render();
+    loadAll();
   });
 
   function renderAway() {
     const away = myAbsence(state.day);
     const voted = myVote(state.day);
-    $("voteForm").hidden = !!away;
+    $("voteForm").hidden = !!away || !voterId;
     $("awayNote").hidden = !away;
-    const offer = state.sb && state.extras && state.loaded && canVoteDay() && !voted && !away;
+    const offer = state.sb && voterId && state.extras && state.loaded && canVoteDay() && !voted && !away;
     $("awayBox").hidden = !offer;
     $("awayBtn").hidden = state.confirmingAway;
     $("awayConfirm").hidden = !state.confirmingAway;
@@ -288,7 +292,7 @@
     return { up, down, mine, net: up - down, upBy, downBy };
   }
   async function react(day, rated, value) {
-    if (!state.sb || rated === voterId) return;
+    if (!state.sb || !voterId || rated === voterId) return;
     const cur = tallyReactions(day, rated).mine;
     const row = { day, rated_voter_id: rated, voter_id: voterId, value: cur === value ? 0 : value };
     const prev = state.reactions.slice();
@@ -308,6 +312,11 @@
   function banner(msg) { const b = $("banner"); b.textContent = msg; b.hidden = !msg; }
 
   // ---------- rendering ----------
+  // How many rated / were out each day. Comes from vote_counts() so it works before you can see the ratings.
+  function countFor(day) {
+    const c = state.counts[day];
+    return c ? c.ratings : ratingsFor(day).length;
+  }
   function ratingsFor(day) {
     return state.votes.filter((v) => v.day === day && v.stars >= 1 && v.stars <= 5)
       .sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
@@ -336,7 +345,7 @@
     nameEl.classList.toggle("empty", !lunch);
     nameEl.hidden = state.editing;
     $("lunchForm").hidden = !state.editing;
-    $("editLunch").hidden = state.editing || !state.sb;
+    $("editLunch").hidden = state.editing || !state.sb || !voterId;
     $("editLunch").textContent = lunch ? "Change name" : "Name this lunch";
 
     computeInsights();
@@ -348,7 +357,12 @@
     if (!state.loaded) return;
     const rs = ratingsFor(state.day);
     if (resultsHidden(state.day)) {
-      const n = rs.length;
+      const n = countFor(state.day);
+      if (!voterId) {
+        body.innerHTML = '<div class="locked">' + cookie(false) + '<div><p class="locked-title">Sign in to see the results</p><p class="empty-note">' +
+          (n ? n + (n === 1 ? " coworker has" : " coworkers have") + " rated this lunch. " : "") + "Sign in above, then rate it to see what everyone thought.</p></div></div>";
+        return;
+      }
       body.innerHTML = '<div class="locked">' + cookie(false) + '<div><p class="locked-title">Rate it to see the results</p><p class="empty-note">' +
         (n ? n + (n === 1 ? " coworker has" : " coworkers have") + " rated this lunch. Results appear once you've added yours" + (state.extras ? ", or said you were out of the office." : ".")
            : "Nobody has rated this lunch yet. Be the first to tap a cookie above.") + "</p></div></div>";
@@ -393,7 +407,7 @@
     [[1, "up", t.up, "Agree with ", t.upBy, "Upvoted by "], [-1, "down", t.down, "Disagree with ", t.downBy, "Downvoted by "]].forEach(([val, cls, n, verb, by, byLabel]) => {
       const b = document.createElement("button");
       b.type = "button"; b.className = "react-btn " + cls + (t.mine === val ? " mine" : "");
-      const off = own || !state.sb;
+      const off = own || !state.sb || !voterId;
       b.classList.toggle("off", off);
       if (off) b.setAttribute("aria-disabled", "true"); // not `disabled`, so hovering still shows who voted
       b.setAttribute("aria-pressed", String(t.mine === val));
@@ -412,11 +426,11 @@
     const body = $("boardBody");
     if (!state.loaded) return;
     const groups = {};
-    const allDays = new Set([...Object.keys(state.days), ...state.votes.map((v) => v.day)]);
+    const allDays = new Set([...Object.keys(state.days), ...Object.keys(state.counts), ...state.votes.map((v) => v.day)]);
     let hiddenDays = 0;
     allDays.forEach((d) => {
+      if (resultsHidden(d)) { if (countFor(d)) hiddenDays++; return; }
       const rs = ratingsFor(d); if (!rs.length) return;
-      if (resultsHidden(d)) { hiddenDays++; return; }
       const name = state.days[d] || "Unnamed lunch";
       const key = name.trim().toLowerCase();
       const g = groups[key] || (groups[key] = { name, days: [], ratings: [] });
@@ -425,7 +439,12 @@
     const rows = Object.values(groups).map((g) => ({ ...g, avg: avg(g.ratings) }))
       .sort((a, b) => b.avg - a.avg || b.ratings.length - a.ratings.length);
     const hiddenNote = hiddenDays ? '<p class="empty-note board-note">' + (hiddenDays === 1 ? "1 recent lunch joins" : hiddenDays + " recent lunches join") + " the leaderboard once you've rated " + (hiddenDays === 1 ? "it" : "them") + ".</p>" : "";
-    if (!rows.length) { body.innerHTML = '<p class="empty-note">Lunches show up here, ranked by average cookies, once people start rating them.</p>' + hiddenNote; return; }
+    if (!rows.length) {
+      body.innerHTML = hiddenNote
+        ? hiddenNote.replace("board-note", "") + (voterId ? "" : '<p class="empty-note board-note">Sign in and rate them to see the rankings.</p>')
+        : '<p class="empty-note">Lunches show up here, ranked by average cookies, once people start rating them.</p>';
+      return;
+    }
     const table = document.createElement("table"); table.className = "board";
     table.innerHTML = '<thead><tr><th>#</th><th>Lunch</th><th style="text-align:right">Avg</th></tr></thead>';
     const tb = document.createElement("tbody");
@@ -489,14 +508,15 @@
     if (!state.loaded || !ins) return;
     const r = ins.recap(monday, weekDates(monday), lunchNameOf, false);
     // Early in the week there's nothing to recap yet, so start on last week instead.
-    if (!state.recapPicked && thisWeek && !r.lunches && !r.hiddenCount) { state.recapPicked = true; state.recapMonday = shift(monday, -7); return renderRecap(); }
+    const weekRated = weekDates(monday).some((d) => countFor(d) > 0); // includes ratings you can't see yet
+    if (!state.recapPicked && thisWeek && !r.lunches && !weekRated) { state.recapPicked = true; state.recapMonday = shift(monday, -7); return renderRecap(); }
     state.recapPicked = true;
     $("copyRecap").hidden = !r.lunches;
     body.replaceChildren();
     if (!r.lunches) {
-      body.appendChild(el("p", "empty-note", r.hiddenCount
-        ? "Rate this week's lunches (or mark yourself out) to see the recap."
-        : "No lunches were rated this week."));
+      body.appendChild(el("p", "empty-note", !weekRated ? "No lunches were rated this week."
+        : voterId ? "Rate this week's lunches (or mark yourself out) to see the recap."
+        : "Sign in and rate this week's lunches to see the recap."));
       return;
     }
     if (r.best) {
@@ -610,7 +630,7 @@
   });
   // Each click is logged for the owner to see in Supabase (supabase/003_rent_clicks.sql). The page can't read the log.
   function logRentClick() {
-    if (!state.sb) return;
+    if (!state.sb || !voterId) return;
     if (store("lunch.rentClickDay") === today) return; // one click per person per day (the database checks too)
     const typed = $("voterName").value.trim();
     const known = state.votes.find((v) => v.voter_id === voterId && v.voter_name) || state.absences.find((a) => a.voter_id === voterId && a.voter_name);
@@ -633,9 +653,13 @@
     state.loaded = true; render(); return;
   }
 
-  state.sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+  state.sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+  });
 
+  let loadSeq = 0;
   async function loadAll() {
+    const seq = ++loadSeq;
     const [d, v] = await Promise.all([
       state.sb.from("days").select("day, lunch"),
       state.sb.from("votes").select("day, voter_id, voter_name, stars, comment, updated_at").limit(10000),
@@ -644,6 +668,7 @@
       banner("Couldn't load the results: " + (d.error || v.error).message + ". Reload the page to try again.");
       return;
     }
+    if (seq !== loadSeq) return; // a newer load (e.g. after signing in) is on its way
     banner("");
     state.days = {}; d.data.forEach((r) => { state.days[r.day] = r.lunch; });
     state.votes = v.data;
@@ -655,6 +680,9 @@
     state.extras = !a.error && !x.error;
     state.absences = a.error ? [] : a.data;
     state.reactions = x.error ? [] : x.data;
+    const c = await state.sb.rpc("vote_counts", { since: shift(earliestVoteDay, -2) });
+    state.counts = {};
+    if (!c.error && Array.isArray(c.data)) c.data.forEach((r) => { state.counts[r.day] = { ratings: r.ratings, outs: r.outs }; });
     const first = !state.loaded;
     state.loaded = true;
     if (first || !state.dirty) loadMyVoteIntoForm();
@@ -662,7 +690,87 @@
   }
 
   const timer = setTimeout(() => { if (!state.loaded) banner("Results are taking a while to load. They'll appear as soon as they arrive."); }, 10000);
-  loadAll().finally(() => clearTimeout(timer));
+
+  // ---------- sign-in ----------
+  // Fires once on load (signed in or not), and again on sign-in / sign-out.
+  state.sb.auth.onAuthStateChange((event, session) => { setTimeout(() => onSession(session), 0); });
+
+  async function onSession(session) {
+    const id = session && session.user ? session.user.id : null;
+    const changed = id !== voterId || !state.loaded;
+    voterId = id; account = session ? session.user : null;
+    renderAuth();
+    if (!changed) return;
+    if (id && legacyId && store("lunch.claimedId") !== legacyId) {
+      const { error } = await state.sb.rpc("claim_voter_id", { old_id: legacyId });
+      if (!error) store("lunch.claimedId", legacyId);
+    }
+    const saved = account && account.user_metadata && account.user_metadata.name;
+    if (saved && !$("voterName").value.trim()) $("voterName").value = saved;
+    await loadAll();
+    clearTimeout(timer);
+    if (!state.dirty) loadMyVoteIntoForm();
+    if (id && !$("voterName").value.trim()) { // fall back to the name on your latest rating
+      const mine = state.votes.filter((v) => v.voter_id === id && v.voter_name).sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)))[0];
+      if (mine) { $("voterName").value = mine.voter_name; store("lunch.name", mine.voter_name); updateSubmit(); }
+    }
+  }
+
+  function renderAuth() {
+    const signedIn = !!voterId;
+    $("authBox").hidden = signedIn;
+    $("whoami").hidden = !signedIn;
+    if (signedIn) $("whoamiText").textContent = "Signed in as " + ((account && account.email) || "you") + ".";
+    render();
+  }
+
+  function authMsg(text, kind) { const st = $("authStatus"); st.className = "status" + (kind ? " " + kind : ""); st.textContent = text; }
+  function friendlyAuthError(error) {
+    const m = (error && error.message) || "";
+    if (/rate limit|too many|security purposes/i.test(m) || (error && error.status === 429))
+      return "Too many sign-in emails were sent recently. Wait a few minutes and try again.";
+    if (/expired|invalid/i.test(m)) return "That code didn't work. It may have expired, so request a new email and use the newest code.";
+    return "That didn't work: " + (m || "please try again.");
+  }
+
+  $("authForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = $("authEmail").value.trim();
+    if (!email) return;
+    $("authSend").disabled = true; authMsg("Sending…");
+    const { error } = await state.sb.auth.signInWithOtp({
+      email, options: { emailRedirectTo: location.href.split("#")[0].split("?")[0] },
+    });
+    $("authSend").disabled = false;
+    if (error) { authMsg(friendlyAuthError(error), "err"); return; }
+    authMsg("");
+    $("authSentTo").textContent = email;
+    $("authStart").hidden = true; $("authSent").hidden = false;
+    $("authCode").focus();
+  });
+  $("authBack").addEventListener("click", () => {
+    $("authSent").hidden = true; $("authStart").hidden = false; authMsg(""); $("authEmail").focus();
+  });
+  $("codeForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const token = $("authCode").value.replace(/\s+/g, "");
+    if (!/^\d{6,10}$/.test(token)) { authMsg("Type the number from the email (usually 6 digits).", "err"); return; }
+    $("authVerify").disabled = true; authMsg("Signing in…");
+    const { error } = await state.sb.auth.verifyOtp({ email: $("authSentTo").textContent, token, type: "email" });
+    $("authVerify").disabled = false;
+    if (error) { authMsg(friendlyAuthError(error), "err"); return; }
+    authMsg("");
+  });
+  $("signOut").addEventListener("click", async () => {
+    await state.sb.auth.signOut();
+    $("authSent").hidden = true; $("authStart").hidden = false;
+  });
+
+  function saveNameToAccount(name) {
+    if (!account || !name) return;
+    const cur = account.user_metadata && account.user_metadata.name;
+    if (cur !== name) state.sb.auth.updateUser({ data: { name } }).then(() => {}, () => {});
+  }
 
   // Live updates while the page is open.
   state.sb.channel("lunch")

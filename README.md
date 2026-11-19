@@ -12,6 +12,14 @@ It's a static site (GitHub Pages) with a free [Supabase](https://supabase.com) d
 2. In the project, open **SQL Editor → New query**, paste in the contents of [`supabase/schema.sql`](supabase/schema.sql), and click **Run**. Then do the same with [`supabase/002_out_of_office_and_rating_votes.sql`](supabase/002_out_of_office_and_rating_votes.sql).
 3. Open **Project Settings → API** and copy the **Project URL** and the **anon public** key.
 
+4. Run [`supabase/003_rent_clicks.sql`](supabase/003_rent_clicks.sql) and then [`supabase/004_accounts.sql`](supabase/004_accounts.sql) the same way.
+
+### 1b. Turn on email sign-in
+
+1. **Authentication → URL Configuration:** set **Site URL** to your page's address (e.g. `https://<your-username>.github.io/lunch-scorecard/`) and add the same address under **Redirect URLs**.
+2. **Authentication → Emails → Templates:** in both **Magic Link** and **Confirm signup**, add a line with the code, e.g. `<p>Or type this code: {{ .Token }}</p>`. People whose link opens in a different browser (like Teams' built-in one) can type the code instead.
+3. **Email sending:** Supabase's built-in sender only allows a few emails per hour. For more than a handful of people, connect your own email service under **Authentication → Emails → SMTP Settings** (Resend, Postmark and SendGrid all have free tiers).
+
 ### 2. Connect the page
 
 Edit [`config.js`](config.js) and paste in the two values:
@@ -36,6 +44,9 @@ Open the page and use **Copy message** at the bottom to get a ready-to-post mess
 
 ## How it works
 
+- **Sign in:** people sign in with their work email (a link or a 6-digit code, no password). Their ratings follow them to any laptop, browser or phone. The first time someone signs in on a laptop they used before sign-in existed, that laptop's old ratings move into their account, so people who used two laptops should sign in on both.
+- **Fair play:** only signed-in people can rate, and nobody can change anyone else's rating. Other people's ratings for a lunch stay hidden, even from the database's public API, until you've rated it or said you were out.
+
 - **Name the lunch:** whoever gets there first types in what was served. Anyone can fix a typo.
 - **Rate it:** 1–5 cookies plus an optional comment. Results for a lunch stay hidden until you rate it (once its week-long voting window closes, anyone can see them). People can change their rating, and can rate lunches from up to a week back.
 - **Out of office:** if you missed lunch, tap **I wasn't in the office for this lunch**. You can then see the results but can't rate that lunch, and this can't be undone.
@@ -52,6 +63,5 @@ Open the page and use **Copy message** at the bottom to get a ready-to-post mess
 
 ## Good to know
 
-- **Votes are tied to a browser, not a login.** Someone on two devices counts as two voters, and clearing site data starts them over as a new voter. That's fine for a lunch poll, but it isn't secure voting.
 - **Fixing data:** open **Table Editor** in Supabase to edit or delete a lunch name or rating.
 - **Free plan pausing:** Supabase pauses free projects after a week with no activity. Daily use keeps it awake. If it does pause, resume it from the Supabase dashboard.

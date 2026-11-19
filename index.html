@@ -239,6 +239,14 @@ textarea { resize: vertical; min-height: 48px; }
   .podium, .awards { grid-template-columns: 1fr; }
 }
 .linkbtn.subtle { color: var(--muted); font-weight: 500; }
+.auth { display: flex; flex-direction: column; gap: 10px; padding: 18px; border-radius: 14px; background: var(--caramel-soft); }
+.auth-step { display: flex; flex-direction: column; gap: 10px; }
+.auth-title { margin: 0; font: 800 1.2rem var(--display); font-variation-settings: "SOFT" 100; color: var(--caramel-deep); }
+.auth .empty-note { color: var(--ink); }
+.auth input { background: var(--card); }
+input[type="email"] { font: inherit; color: var(--ink); background: var(--bg); border: 1.5px solid var(--line); border-radius: 12px; padding: 11px 14px; width: 100%; }
+input[type="email"]:focus { border-color: var(--caramel); outline: none; }
+.whoami { margin: 0; font-size: 0.82rem; color: var(--muted); overflow-wrap: anywhere; }
 .away { border-top: 1.5px dashed var(--line); padding-top: 16px; }
 .away-confirm { display: flex; flex-direction: column; gap: 12px; }
 .away-confirm p { margin: 0; color: var(--ink); }
@@ -388,6 +396,27 @@ footer { text-align: center; color: var(--muted); font-size: 0.8rem; }
         </form>
       </div>
 
+      <div class="auth" id="authBox" hidden>
+        <div class="auth-step" id="authStart">
+          <p class="auth-title">Sign in to rate</p>
+          <p class="empty-note">Use your work email. You'll get a sign-in link, and your ratings will follow you to any laptop or phone.</p>
+          <form class="editrow" id="authForm">
+            <input type="email" id="authEmail" placeholder="you@company.com" autocomplete="email" required aria-label="Work email">
+            <button class="btn primary" type="submit" id="authSend">Email me a link</button>
+          </form>
+        </div>
+        <div class="auth-step" id="authSent" hidden>
+          <p class="auth-title">Check your email</p>
+          <p class="empty-note">We sent a sign-in link to <strong id="authSentTo"></strong>. Open it on this device, or type the code from the email here.</p>
+          <form class="editrow" id="codeForm">
+            <input type="text" id="authCode" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="6-digit code" aria-label="Code from the email">
+            <button class="btn primary" type="submit" id="authVerify">Sign in</button>
+            <button class="btn ghost" type="button" id="authBack">Use a different email</button>
+          </form>
+        </div>
+        <span class="status" id="authStatus" role="status"></span>
+      </div>
+
       <form class="voteform" id="voteForm">
         <div class="field">
           <label class="eyebrow" for="voterName">Your name</label>
@@ -418,6 +447,7 @@ footer { text-align: center; color: var(--muted); font-size: 0.8rem; }
       </div>
       <p class="streak-line" id="streakLine" hidden></p>
       <p class="kbd-hint">Tip: press <kbd>←</kbd> <kbd>→</kbd> to move between lunches.</p>
+      <p class="whoami" id="whoami" hidden><span id="whoamiText"></span> <button class="linkbtn subtle" id="signOut" type="button">Sign out</button></p>
       <div class="away-note" id="awayNote" hidden>
         <strong>You were out of the office for this lunch.</strong>
         You can see the results below, but you can't rate it.
