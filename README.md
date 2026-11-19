@@ -48,6 +48,8 @@ Open the page and use **Copy message** at the bottom to get a ready-to-post mess
 - **Calendar:** tap the date in the caramel bar to open a month view of lunch days, showing each lunch's name and whether you rated it, were out, or still need to. Tap a day to jump to it.
 - **Lunch days only:** lunch is Monday to Thursday (change `lunchWeekdays` in `config.js` if that changes). The date arrows skip other days, and on Friday or the weekend the page opens on Thursday's lunch.
 
+- **Rent fund:** a joke tip jar at the bottom with $1, $5 and $20 buttons that open Venmo with the amount and a note filled in. Set `rentFund.venmoUser` in `config.js` to your Venmo username, or leave it empty to hide the jar.
+
 ## Good to know
 
 - **Votes are tied to a browser, not a login.** Someone on two devices counts as two voters, and clearing site data starts them over as a new voter. That's fine for a lunch poll, but it isn't secure voting.

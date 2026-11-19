@@ -324,6 +324,25 @@ footer { text-align: center; color: var(--muted); font-size: 0.8rem; }
   .wrap { max-width: 1240px; }
   .cols { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); }
 }
+/* ---------- rent fund (Venmo tip jar) ---------- */
+.o7 { order: 7; }
+.rent { flex-direction: row; align-items: center; gap: 22px; background: linear-gradient(135deg, var(--card), var(--caramel-soft)); }
+.rent-jar { flex: none; width: 92px; height: 110px; position: relative; border: 3px solid var(--caramel); border-top-width: 6px; border-radius: 14px 14px 22px 22px; background: color-mix(in srgb, var(--card) 60%, transparent); overflow: hidden; }
+.rent-jar::before { content: ""; position: absolute; left: 10px; right: 10px; top: -6px; height: 10px; background: var(--caramel-deep); border-radius: 4px; }
+.rent-jar span { position: absolute; inset: auto 6px 6px; display: flex; flex-wrap: wrap-reverse; justify-content: center; }
+.rent-jar svg { width: 30px; height: 30px; margin: -5px -3px; }
+.rent-jar svg:nth-child(2n) { transform: rotate(25deg); }
+.rent-jar svg:nth-child(3n) { transform: rotate(-30deg); }
+.rent-body { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.tag.small { font-size: 0.62rem; padding: 3px 8px; }
+.rent-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.rent-btn { display: inline-flex; flex-direction: column; align-items: flex-start; text-decoration: none; color: var(--ink); background: var(--card); border: 1.5px solid var(--line); border-radius: 12px; padding: 8px 14px; transition: border-color .15s, transform .15s; }
+.rent-btn:hover { border-color: var(--caramel); transform: translateY(-2px) rotate(-1deg); }
+.rent-btn strong { font: 800 1.1rem var(--display); font-variation-settings: "SOFT" 100; color: var(--caramel-deep); }
+.rent-btn span { font-size: 0.75rem; color: var(--muted); }
+.rent-fine { margin: 0; font-size: 0.75rem; color: var(--muted); }
+@media (min-width: 960px) { .rent { grid-column: 1 / -1; } }
+@media (max-width: 460px) { .rent { flex-direction: column; align-items: flex-start; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
 </head>
@@ -455,6 +474,16 @@ footer { text-align: center; color: var(--muted); font-size: 0.8rem; }
       <span class="status" id="copyStatus" role="status"></span>
     </div>
   </section>
+    <section class="card o7 rent" id="rentFund" aria-labelledby="rentTitle" hidden>
+      <div class="rent-jar" aria-hidden="true"><span id="rentJar"></span></div>
+      <div class="rent-body">
+        <span class="tag small">Totally optional</span>
+        <h2 id="rentTitle">Help pay <span id="rentName">Leonard</span>'s rent</h2>
+        <p class="empty-note" id="rentPitch">Rent is due and the lunches are free. Coincidence? Toss a cookie's worth into the jar.</p>
+        <div class="rent-btns" id="rentBtns"></div>
+        <p class="rent-fine">Opens Venmo. 100% of proceeds go to rent, and 0% go toward a better lunch rating.</p>
+      </div>
+    </section>
   </main>
 
   <footer>Ratings refresh live while this page is open.</footer>
