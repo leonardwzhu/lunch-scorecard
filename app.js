@@ -1,7 +1,27 @@
 (function () {
   "use strict";
-  const STAR_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6L2.5 9.4l6.6-.8z"/></svg>';
-  const LABELS = ["", "1 · Skip it", "2 · Meh", "3 · Fine", "4 · Good", "5 · Order it again"];
+  const LABELS = ["", "1 · Stale", "2 · Crumbly", "3 · Fine", "4 · Tasty", "5 · Dunk-worthy"];
+
+  // A scalloped cookie, drawn once and reused everywhere a rating shows.
+  const COOKIE_PATH = (() => {
+    const pts = [];
+    for (let i = 0; i < 120; i++) {
+      const a = (i / 120) * Math.PI * 2;
+      const r = 21 + 1.3 * Math.cos(a * 16);
+      pts.push((24 + r * Math.cos(a)).toFixed(2) + " " + (24 + r * Math.sin(a)).toFixed(2));
+    }
+    return "M" + pts.join("L") + "Z";
+  })();
+  function cookie(on, opts) {
+    const o = opts || {};
+    const dots = o.dots === false ? "" :
+      '<g class="ck-dots"><circle cx="17" cy="19" r="1.5"/><circle cx="30" cy="17" r="1.5"/><circle cx="24" cy="26" r="1.5"/><circle cx="31" cy="30" r="1.5"/><circle cx="16" cy="30" r="1.5"/></g>';
+    return '<svg viewBox="0 0 48 48" aria-hidden="true"' + (on ? "" : ' class="off"') + (o.cls ? ' data-k="' + o.cls + '"' : "") + '>' +
+      '<path class="ck-body" d="' + COOKIE_PATH + '"/><circle class="ck-ring" cx="24" cy="24" r="16.5"/>' + dots + "</svg>";
+  }
+  function cookieEl(on, opts) { const t = document.createElement("template"); t.innerHTML = cookie(on, opts); return t.content.firstChild; }
+
+  const hero = cookieEl(true); hero.classList.add("hero-cookie"); document.getElementById("heroCookie").appendChild(hero);
   const MAX_BACK_DAYS = 7; // matches the votes_recent_day check in supabase/schema.sql
   const $ = (id) => document.getElementById(id);
 
@@ -35,9 +55,12 @@
   for (let i = 1; i <= 5; i++) {
     const b = document.createElement("button");
     b.type = "button"; b.className = "star"; b.id = "star" + i;
-    b.setAttribute("role", "radio"); b.setAttribute("aria-label", i + " star" + (i > 1 ? "s" : ""));
-    b.innerHTML = STAR_SVG;
-    b.addEventListener("click", () => { state.pick = i; state.dirty = true; paintStars(); updateSubmit(); });
+    b.setAttribute("role", "radio"); b.setAttribute("aria-label", i + " cookie" + (i > 1 ? "s" : ""));
+    b.innerHTML = cookie(false);
+    b.addEventListener("click", () => {
+      state.pick = i; state.dirty = true; paintStars(); updateSubmit();
+      for (let j = 1; j <= i; j++) { const s = $("star" + j); s.classList.remove("pop"); void s.offsetWidth; s.style.animationDelay = (j - 1) * 40 + "ms"; s.classList.add("pop"); }
+    });
     b.addEventListener("mouseenter", () => paintStars(i));
     b.addEventListener("mouseleave", () => paintStars());
     starsEl.appendChild(b);
@@ -48,10 +71,13 @@
     for (let i = 1; i <= 5; i++) {
       const b = $("star" + i);
       b.classList.toggle("on", i <= v);
+      b.firstChild.classList.toggle("off", i > v);
       b.setAttribute("aria-checked", String(i === state.pick));
       b.disabled = !state.sb || !canVoteDay();
     }
-    $("starLabel").textContent = !canVoteDay() ? "Voting is closed for this day" : (v ? LABELS[v] : "Pick a rating");
+    const label = $("starLabel");
+    label.textContent = !canVoteDay() ? "Voting is closed for this day" : (v ? LABELS[v] : "Tap a cookie");
+    label.classList.toggle("idle", !v || !canVoteDay());
   }
 
   const myVote = (day) => state.votes.find((v) => v.day === day && v.voter_id === voterId);
@@ -141,7 +167,7 @@
   function hue(s) { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) % 360; return h; }
   function avatar(name, id) {
     const el = document.createElement("span"); el.className = "avatar";
-    el.style.background = "hsl(" + hue(id) + " 45% 42%)";
+    const h = hue(id); el.style.background = "hsl(" + (8 + (h % 40)) + " " + (35 + (h % 25)) + "% " + (30 + (h % 4) * 6) + "%)";
     el.textContent = (name || "?").split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
     el.setAttribute("aria-hidden", "true");
     return el;
@@ -173,9 +199,10 @@
     if (!rs.length) { body.innerHTML = '<p class="empty-note">No ratings for this day yet. Be the first to pick some stars above.</p>'; return; }
     const counts = [0, 0, 0, 0, 0, 0]; rs.forEach((r) => counts[r.stars]++);
     const max = Math.max(...counts);
-    let html = '<div class="tally"><div class="big"><span class="num">' + avg(rs).toFixed(1) + '</span><span class="sub">out of 5 · ' + rs.length + " rating" + (rs.length > 1 ? "s" : "") + '</span></div><div class="dist">';
-    for (let i = 5; i >= 1; i--) html += '<div class="row"><span>' + i + '★</span><span class="bar"><i style="width:' + (max ? (counts[i] / max) * 100 : 0) + '%"></i></span><span>' + counts[i] + "</span></div>";
-    html += '</div></div><ul class="voters" id="voterList"></ul>';
+    let html = '<div class="tally"><div class="badge">' + cookie(true, { dots: false }) + '<div><span class="num">' + avg(rs).toFixed(1) + '</span><span class="of">OUT OF 5</span></div></div><div class="dist">';
+    for (let i = 5; i >= 1; i--) html += '<div class="row"><span class="lbl">' + i + cookie(true, { dots: false }) + '</span><span class="bar"><i style="width:' + (max ? (counts[i] / max) * 100 : 0) + '%"></i></span><span>' + counts[i] + "</span></div>";
+    html += '</div><span class="sub">' + rs.length + " rating" + (rs.length > 1 ? "s" : "") + " so far</span></div>";
+    html += '<ul class="voters" id="voterList"></ul>';
     body.innerHTML = html;
     const list = $("voterList");
     rs.forEach((r) => {
@@ -185,8 +212,9 @@
       who.textContent = r.voter_id === voterId ? "You" : (r.voter_name || "A coworker");
       mid.appendChild(who);
       if (r.comment) { const n = document.createElement("div"); n.className = "note"; n.textContent = r.comment; mid.appendChild(n); }
-      const sc = document.createElement("div"); sc.className = "score"; sc.textContent = "★".repeat(r.stars);
-      sc.setAttribute("aria-label", r.stars + " out of 5");
+      const sc = document.createElement("div"); sc.className = "score";
+      for (let k = 1; k <= 5; k++) sc.appendChild(cookieEl(k <= r.stars, { dots: false }));
+      sc.setAttribute("role", "img"); sc.setAttribute("aria-label", r.stars + " out of 5 cookies");
       li.append(avatar(r.voter_name, r.voter_id), mid, sc); list.appendChild(li);
     });
   }
@@ -210,7 +238,7 @@
     table.innerHTML = '<thead><tr><th>#</th><th>Lunch</th><th style="text-align:right">Avg</th></tr></thead>';
     const tb = document.createElement("tbody");
     rows.forEach((r, i) => {
-      const tr = document.createElement("tr"); if (i < 3) tr.className = "top";
+      const tr = document.createElement("tr"); if (i < 3) tr.className = i === 0 ? "top first" : "top";
       const last = r.days.sort().slice(-1)[0];
       const tdR = document.createElement("td"); tdR.className = "rank"; tdR.textContent = i + 1;
       const tdD = document.createElement("td"); tdD.className = "dish"; tdD.textContent = r.name;
@@ -219,7 +247,9 @@
       const sm = document.createElement("small");
       sm.textContent = (r.days.length > 1 ? "Served " + r.days.length + " times · last " : "Served ") + pretty(last, { month: "short", day: "numeric" }) + " · " + r.ratings.length + " rating" + (r.ratings.length > 1 ? "s" : "");
       tdD.appendChild(sm);
-      const tdA = document.createElement("td"); tdA.className = "avg"; tdA.textContent = r.avg.toFixed(1) + " ★";
+      const tdA = document.createElement("td"); tdA.className = "avg";
+      const av = document.createElement("span"); av.textContent = r.avg.toFixed(1); av.appendChild(cookieEl(true, { dots: false }));
+      av.setAttribute("aria-label", r.avg.toFixed(1) + " out of 5"); tdA.appendChild(av);
       tr.append(tdR, tdD, tdA); tb.appendChild(tr);
     });
     table.appendChild(tb);
@@ -230,7 +260,7 @@
     const cfg = window.LUNCH_CONFIG || {};
     const lunch = state.days[today];
     $("shareText").textContent = "🍽️ Lunch poll for " + pretty(today) + (cfg.teamName ? " (" + cfg.teamName + ")" : "") +
-      (lunch ? ": " + lunch : "") + "\nHow was it? Rate it 1–5 stars here: " + location.href.split("#")[0].split("?")[0];
+      (lunch ? ": " + lunch : "") + "\nHow was it? Rate it 1–5 cookies here: " + location.href.split("#")[0].split("?")[0];
   }
   $("copyShare").addEventListener("click", () => {
     const text = $("shareText").textContent, st = $("copyStatus");
