@@ -48,6 +48,8 @@ Open the page and use **Copy message** at the bottom to get a ready-to-post mess
 - **Calendar:** tap the date in the caramel bar to open a month view of lunch days, showing each lunch's name and whether you rated it, were out, or still need to. Tap a day to jump to it.
 - **Lunch days only:** lunch is Monday to Thursday (change `lunchWeekdays` in `config.js` if that changes). The date arrows skip other days, and on Friday or the weekend the page opens on Thursday's lunch.
 
+- **The rent button:** "Help pay Leonard's rent" in the top right just asks "wait, would u acc?". Each click is logged (run [`supabase/003_rent_clicks.sql`](supabase/003_rent_clicks.sql) once). Only the Supabase project owner can see who clicked, in **Table Editor → rent_clicks**, or as a per-person summary with `select * from rent_clicks_by_person;` in the SQL Editor.
+
 ## Good to know
 
 - **Votes are tied to a browser, not a login.** Someone on two devices counts as two voters, and clearing site data starts them over as a new voter. That's fine for a lunch poll, but it isn't secure voting.
