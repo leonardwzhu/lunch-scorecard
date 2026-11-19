@@ -62,7 +62,7 @@ body {
   background-size: 140px 140px, 90px 90px, 210px 210px;
   -webkit-font-smoothing: antialiased;
 }
-.wrap { max-width: 620px; margin: 0 auto; padding-block: 36px 72px;
+.wrap { max-width: 620px; width: 100%; margin: 0 auto; padding-block: 36px 72px;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
   display: flex; flex-direction: column; gap: 24px; }
 
@@ -298,6 +298,32 @@ footer { text-align: center; color: var(--muted); font-size: 0.8rem; }
   .tally .sub { margin-top: -6px; text-align: center; }
   .dist { width: 100%; }
 }
+/* ---------- layout: one column on phones, two on laptops ---------- */
+.cols { display: flex; flex-direction: column; gap: 24px; }
+.col { display: contents; } /* on phones the columns dissolve and the cards follow the order below */
+.o1 { order: 1; } .o2 { order: 2; } .o3 { order: 3; } .o4 { order: 4; } .o5 { order: 5; } .o6 { order: 6; }
+.kbd-hint { display: none; }
+@media (min-width: 960px) {
+  .wrap { max-width: 1180px; padding-block: 44px 80px; gap: 28px; }
+  header { grid-template-columns: 1fr auto; }
+  header p { max-width: 52ch; }
+  h1 { font-size: 3.6rem; }
+  .hero-cookie { width: 120px; height: 120px; }
+  .cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+  .col { display: flex; flex-direction: column; gap: 28px; min-width: 0; }
+  .share { grid-column: 1 / -1; }
+  .share pre { max-width: 75ch; }
+  .card { padding: 26px; }
+  .ballot { padding: 0; }
+  .ballot .inner { padding: 26px; }
+  .cal { padding-inline: 22px; }
+  .kbd-hint { display: block; font-size: 0.78rem; color: var(--muted); }
+  .kbd-hint kbd { font: 500 0.72rem var(--mono); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; background: var(--bg); color: var(--ink); }
+}
+@media (min-width: 1280px) {
+  .wrap { max-width: 1240px; }
+  .cols { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); }
+}
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
 </head>
@@ -314,7 +340,9 @@ footer { text-align: center; color: var(--muted); font-size: 0.8rem; }
 
   <div id="banner" class="banner" hidden></div>
 
-  <section class="card ballot" aria-labelledby="lunchName">
+  <main class="cols">
+    <div class="col col-a">
+  <section class="card o1 ballot" aria-labelledby="lunchName">
     <div class="wrapper">
       <button class="iconbtn" id="prevDay" aria-label="Previous day">‹</button>
       <button class="date datebtn" id="dateLabel" type="button" aria-expanded="false" aria-controls="cal">Today</button>
@@ -377,6 +405,7 @@ footer { text-align: center; color: var(--muted); font-size: 0.8rem; }
         </div>
       </div>
       <p class="streak-line" id="streakLine" hidden></p>
+      <p class="kbd-hint">Tip: press <kbd>←</kbd> <kbd>→</kbd> to move between lunches.</p>
       <div class="away-note" id="awayNote" hidden>
         <strong>You were out of the office for this lunch.</strong>
         You can see the results below, but you can't rate it.
@@ -384,17 +413,23 @@ footer { text-align: center; color: var(--muted); font-size: 0.8rem; }
     </div>
   </section>
 
-  <section class="card" aria-labelledby="tallyTitle">
-    <h2 id="tallyTitle">Results so far</h2>
-    <div id="tallyBody"><p class="empty-note">Loading ratings…</p></div>
-  </section>
-
-  <section class="card" aria-labelledby="boardTitle">
+  <section class="card o3" aria-labelledby="boardTitle">
     <h2 id="boardTitle">All-time leaderboard</h2>
     <div id="boardBody" class="scroll"><p class="empty-note">Loading…</p></div>
   </section>
 
-  <section class="card" aria-labelledby="recapTitle">
+  <section class="card o5" aria-labelledby="tasteTitle">
+    <h2 id="tasteTitle">Taste twins</h2>
+    <div id="tasteBody"><p class="empty-note">Loading…</p></div>
+  </section>
+    </div>
+    <div class="col col-b">
+  <section class="card o2" aria-labelledby="tallyTitle">
+    <h2 id="tallyTitle">Results so far</h2>
+    <div id="tallyBody"><p class="empty-note">Loading ratings…</p></div>
+  </section>
+
+  <section class="card o4" aria-labelledby="recapTitle">
     <div class="card-head">
       <h2 id="recapTitle">Weekly recap</h2>
       <div class="weeknav">
@@ -410,13 +445,8 @@ footer { text-align: center; color: var(--muted); font-size: 0.8rem; }
     </div>
     <pre id="recapText" hidden></pre>
   </section>
-
-  <section class="card" aria-labelledby="tasteTitle">
-    <h2 id="tasteTitle">Taste twins</h2>
-    <div id="tasteBody"><p class="empty-note">Loading…</p></div>
-  </section>
-
-  <section class="card share" aria-labelledby="shareTitle">
+    </div>
+  <section class="card o6 share" aria-labelledby="shareTitle">
     <h2 id="shareTitle">Post it in Teams</h2>
     <p class="empty-note">Copy this message into your Teams channel each day, or pin the page once as a channel tab.</p>
     <pre id="shareText"></pre>
@@ -425,6 +455,7 @@ footer { text-align: center; color: var(--muted); font-size: 0.8rem; }
       <span class="status" id="copyStatus" role="status"></span>
     </div>
   </section>
+  </main>
 
   <footer>Ratings refresh live while this page is open.</footer>
 </div>

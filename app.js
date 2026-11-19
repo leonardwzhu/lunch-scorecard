@@ -129,6 +129,15 @@
   $("calPrev").addEventListener("click", () => { state.calMonth = shiftMonth(state.calMonth, -1); renderCal(); });
   $("calNext").addEventListener("click", () => { state.calMonth = shiftMonth(state.calMonth, 1); renderCal(); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && state.calOpen) { state.calOpen = false; renderCal(); $("dateLabel").focus(); } });
+  // ← → step between lunches (not while typing in a box).
+  document.addEventListener("keydown", (e) => {
+    if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    const t = e.target;
+    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable || t.getAttribute("role") === "radio")) return;
+    if (e.key === "ArrowLeft") { e.preventDefault(); setDay(stepWorkday(state.day, -1)); }
+    else { const n = stepWorkday(state.day, 1); if (n <= today) { e.preventDefault(); setDay(n); } }
+  });
 
   function renderCal() {
     const cal = $("cal"), btn = $("dateLabel");
