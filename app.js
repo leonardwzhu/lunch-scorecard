@@ -196,7 +196,7 @@
     const body = $("tallyBody");
     if (!state.loaded) return;
     const rs = ratingsFor(state.day);
-    if (!rs.length) { body.innerHTML = '<p class="empty-note">No ratings for this day yet. Be the first to pick some stars above.</p>'; return; }
+    if (!rs.length) { body.innerHTML = '<p class="empty-note">No ratings for this day yet. Be the first to tap a cookie above.</p>'; return; }
     const counts = [0, 0, 0, 0, 0, 0]; rs.forEach((r) => counts[r.stars]++);
     const max = Math.max(...counts);
     let html = '<div class="tally"><div class="badge">' + cookie(true, { dots: false }) + '<div><span class="num">' + avg(rs).toFixed(1) + '</span><span class="of">OUT OF 5</span></div></div><div class="dist">';
@@ -233,7 +233,7 @@
     });
     const rows = Object.values(groups).map((g) => ({ ...g, avg: avg(g.ratings) }))
       .sort((a, b) => b.avg - a.avg || b.ratings.length - a.ratings.length);
-    if (!rows.length) { body.innerHTML = '<p class="empty-note">Lunches show up here, ranked by average stars, once people start rating them.</p>'; return; }
+    if (!rows.length) { body.innerHTML = '<p class="empty-note">Lunches show up here, ranked by average cookies, once people start rating them.</p>'; return; }
     const table = document.createElement("table"); table.className = "board";
     table.innerHTML = '<thead><tr><th>#</th><th>Lunch</th><th style="text-align:right">Avg</th></tr></thead>';
     const tb = document.createElement("tbody");
