@@ -3,6 +3,6 @@
 // The anon key is meant to be public; the access rules in supabase/schema.sql control what it can do.
 window.LUNCH_CONFIG = {
   supabaseUrl: "https://wwceeniyqlgzswsyjqzk.supabase.co",
-  supabaseAnonKey: "",  // starts with "eyJ..."
+  supabaseAnonKey: "sb_publishable_g31h0mZLxL3KKgZuYPnDTQ_8QE_9n4d",
   teamName: "",         // optional, shown in the Teams message, e.g. "the design team"
 };

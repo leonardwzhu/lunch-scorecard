@@ -36,6 +36,10 @@ create trigger votes_recent_day before insert or update on public.votes
 alter table public.days  enable row level security;
 alter table public.votes enable row level security;
 
+-- Let the page's public key use the tables (newer projects don't grant this by default).
+grant usage on schema public to anon, authenticated;
+grant select, insert, update on public.days, public.votes to anon, authenticated;
+
 -- Anyone with the link can read results, name a lunch and rate it.
 -- There's no login: each browser gets a random voter id that the page keeps.
 drop policy if exists "read days"   on public.days;
