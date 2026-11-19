@@ -611,10 +611,12 @@
   // Each click is logged for the owner to see in Supabase (supabase/003_rent_clicks.sql). The page can't read the log.
   function logRentClick() {
     if (!state.sb) return;
+    if (store("lunch.rentClickDay") === today) return; // one click per person per day (the database checks too)
     const typed = $("voterName").value.trim();
     const known = state.votes.find((v) => v.voter_id === voterId && v.voter_name) || state.absences.find((a) => a.voter_id === voterId && a.voter_name);
     const name = (typed || (known && known.voter_name) || "").slice(0, 40);
-    state.sb.from("rent_clicks").insert({ voter_id: voterId, voter_name: name }).then(() => {}, () => {});
+    state.sb.from("rent_clicks").insert({ voter_id: voterId, voter_name: name, click_day: today })
+      .then(({ error }) => { if (!error || error.code === "23505") store("lunch.rentClickDay", today); }, () => {});
   }
   document.addEventListener("click", (e) => {
     if (!$("rentBubble").hidden && !e.target.closest(".hero-side")) { $("rentBubble").hidden = true; $("rentJoke").setAttribute("aria-expanded", "false"); }
