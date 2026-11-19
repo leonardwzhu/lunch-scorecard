@@ -56,6 +56,7 @@
     absences: [],   // who was out of the office, per day
     reactions: [],  // up/down votes on people's ratings
     extras: true,   // false until the 002 SQL has been run in Supabase
+    tips: [], rentReady: false, // the joke rent jar (003 SQL)
     loaded: false, pick: 0, dirty: false, editing: false, confirmingAway: false,
   };
 
@@ -340,7 +341,7 @@
     $("editLunch").textContent = lunch ? "Change name" : "Name this lunch";
 
     computeInsights();
-    renderCal(); renderAway(); renderStreak(); renderTally(); renderBoard(); renderRecap(); renderTaste(); renderShare();
+    renderCal(); renderAway(); renderStreak(); renderTally(); renderBoard(); renderRecap(); renderTaste(); renderRent(); renderShare();
   }
 
   function renderTally() {
@@ -588,6 +589,94 @@
     }
   }
 
+  // ---------- the rent jar (a joke: no real money) ----------
+  const RENT = (window.LUNCH_CONFIG || {}).rentJar;
+  const DAILY_TIPS = 20; // matches supabase/003_rent_jar.sql
+  const MILESTONES = [
+    [0, "Nothing yet. It's crackers for dinner again."],
+    [1, "a single gumball"],
+    [5, "one (1) avocado"],
+    [15, "a burrito, no guac"],
+    [30, "a burrito, WITH guac"],
+    [60, "the internet bill"],
+    [120, "a week of groceries"],
+    [250, "the electric bill"],
+    [600, "a quarter of the rent"],
+    [1200, "half the rent"],
+    [1800, "most of the rent (the landlord is cautiously optimistic)"],
+  ];
+  if (RENT && RENT.name) {
+    $("rentTitle").textContent = "Help pay " + RENT.name + "'s rent";
+    $("rentBlurb").textContent = "Every cookie counts, and " + RENT.name + " is counting on you. No real money changes hands, and cookies have no cash value.";
+  }
+  const money = (n) => "$" + n.toLocaleString();
+  const myTipsToday = () => { const since = Date.now() - 864e5; return state.tips.filter((t) => t.voter_id === voterId && Date.parse(t.created_at) > since).length; };
+
+  function renderRent() {
+    const card = $("rentCard");
+    card.hidden = !(RENT && state.rentReady);
+    if (card.hidden) return;
+    const rent = RENT.rent > 0 ? RENT.rent : 2400;
+    const total = state.tips.length;
+    const months = Math.floor(total / rent), into = total % rent;
+    $("rentAmt").textContent = money(into);
+    $("rentOf").textContent = "of " + money(rent) + " rent";
+    $("rentMonths").textContent = months ? months + " month" + (months > 1 ? "s" : "") + " paid 🎉" : "";
+    $("rentFill").style.width = (into / rent) * 100 + "%";
+    const bar = $("rentBar"); bar.setAttribute("aria-valuemax", rent); bar.setAttribute("aria-valuenow", into);
+    let ms = MILESTONES[0][1];
+    MILESTONES.forEach(([n, text]) => { if (into >= n) ms = text; });
+    $("rentMilestone").textContent = months && into === 0 ? "THE RENT. It's paid. Until next month." : ms;
+    const left = DAILY_TIPS - myTipsToday();
+    $("rentBtn").disabled = left <= 0;
+    if (!$("rentStatus").dataset.busy) $("rentStatus").textContent = left <= 0 ? "That's your " + DAILY_TIPS + " cookies for today. " + RENT.name + " thanks you." : (left < DAILY_TIPS ? left + " cookies left to give today" : "");
+
+    const by = new Map();
+    state.tips.forEach((t) => {
+      const k = (t.voter_name || "").trim().toLowerCase() || "id:" + t.voter_id;
+      const e = by.get(k) || { name: t.voter_id === voterId ? "You" : (t.voter_name || "Anonymous patron"), n: 0 };
+      if (t.voter_id === voterId) e.name = "You";
+      e.n++; by.set(k, e);
+    });
+    const top = [...by.values()].sort((a, b) => b.n - a.n).slice(0, 3);
+    const box = $("rentPatrons"); box.replaceChildren();
+    if (!top.length) return;
+    box.appendChild(el("p", "eyebrow patrons-title", "Top patrons"));
+    const ul = el("ul", "patrons");
+    top.forEach((p, i) => { const li = el("li"); li.append(el("span", "rk", String(i + 1)), el("span", null, p.name), el("span", "ct", p.n + " 🍪")); ul.appendChild(li); });
+    box.appendChild(ul);
+  }
+
+  function flyCookie(from) {
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const a = from.getBoundingClientRect(), b = $("rentFill").getBoundingClientRect();
+    const c = cookieEl(true); c.classList.add("flying-cookie");
+    c.style.left = a.left + a.width / 2 - 17 + "px"; c.style.top = a.top - 10 + "px";
+    c.style.setProperty("--dx", (b.right - (a.left + a.width / 2)) + "px");
+    c.style.setProperty("--dy", (b.top - a.top) + "px");
+    document.body.appendChild(c); setTimeout(() => c.remove(), 950);
+  }
+
+  $("rentBtn").addEventListener("click", async () => {
+    if (!state.sb || myTipsToday() >= DAILY_TIPS) return;
+    const row = { voter_id: voterId, voter_name: $("voterName").value.trim().slice(0, 40), created_at: new Date().toISOString(), _local: true };
+    state.tips.push(row); flyCookie($("rentBtn")); renderRent();
+    const { _local, created_at, ...send } = row;
+    const { data, error } = await state.sb.from("rent_tips").insert(send).select("id").single();
+    const st = $("rentStatus");
+    if (error) {
+      state.tips = state.tips.filter((t) => t !== row);
+      st.className = "status err";
+      st.textContent = /limit/i.test(error.message) ? "That's your " + DAILY_TIPS + " cookies for today. " + RENT.name + " thanks you." : "Your cookie didn't make it. Try again.";
+      renderRent(); return;
+    }
+    row.id = data && data.id; delete row._local;
+    st.className = "status ok";
+    const thanks = ["Thank you, patron.", "The landlord has been notified.", "A true philanthropist.", "That's one more cookie than yesterday.", "Your generosity is noted."];
+    st.dataset.busy = "1"; st.textContent = thanks[Math.floor(Math.random() * thanks.length)];
+    setTimeout(() => { delete st.dataset.busy; st.className = "status"; renderRent(); }, 1800);
+  });
+
   function renderShare() {
     const cfg = window.LUNCH_CONFIG || {};
     const lunch = state.days[lunchToday];
@@ -600,6 +689,28 @@
     if (!navigator.clipboard) return fallback();
     navigator.clipboard.writeText(text).then(() => { st.className = "status ok"; st.textContent = "Copied"; }, fallback);
   });
+
+  // ---------- rent fund (a joke tip jar; shown only when a Venmo username is set) ----------
+  (function rentFund() {
+    const rf = (window.LUNCH_CONFIG || {}).rentFund || {};
+    const user = String(rf.venmoUser || "").replace(/^@/, "").trim();
+    if (!/^[A-Za-z0-9_-]{2,40}$/.test(user)) return;
+    const name = String(rf.name || "Leonard").slice(0, 30);
+    $("rentName").textContent = name;
+    $("rentPitch").textContent = "Rent is due and the lunches are free. Coincidence? Toss a cookie's worth into " + name + "'s jar.";
+    const jar = $("rentJar"); for (let i = 0; i < 7; i++) jar.appendChild(cookieEl(true));
+    [[1, "One cookie", "a crumb of support"], [5, "A lunch tip", "covers a doorknob"], [20, "Patron of the arts", "basically a landlord"]].forEach(([amt, label, sub]) => {
+      const a = document.createElement("a");
+      a.className = "rent-btn";
+      a.href = "https://venmo.com/" + encodeURIComponent(user) + "?txn=pay&amount=" + amt + "&note=" + encodeURIComponent(name + "'s rent fund 🍪");
+      a.target = "_blank"; a.rel = "noopener noreferrer";
+      a.setAttribute("aria-label", "Send $" + amt + " to " + name + " on Venmo");
+      const st = document.createElement("strong"); st.textContent = "$" + amt + " · " + label;
+      const sp = document.createElement("span"); sp.textContent = sub;
+      a.append(st, sp); $("rentBtns").appendChild(a);
+    });
+    $("rentFund").hidden = false;
+  })();
 
   // ---------- boot ----------
   paintStars(); render();
@@ -632,6 +743,10 @@
       state.sb.from("rating_votes").select("day, rated_voter_id, voter_id, value").limit(50000),
     ]);
     state.extras = !a.error && !x.error;
+    if (RENT) {
+      const t = await state.sb.from("rent_tips").select("id, voter_id, voter_name, created_at").order("id").limit(100000);
+      state.rentReady = !t.error; state.tips = t.error ? [] : t.data;
+    }
     state.absences = a.error ? [] : a.data;
     state.reactions = x.error ? [] : x.data;
     const first = !state.loaded;
@@ -653,6 +768,13 @@
     })
     .on("postgres_changes", { event: "*", schema: "public", table: "rating_votes" }, (p) => {
       if (p.new && p.new.day) { mergeRow(state.reactions, p.new, ["day", "rated_voter_id", "voter_id"]); renderTally(); }
+    })
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "rent_tips" }, (p) => {
+      const t = p.new; if (!t || state.tips.some((x) => x.id === t.id)) return;
+      // our own cookie may still be waiting for its id
+      const mine = state.tips.find((x) => x._local && x.voter_id === t.voter_id);
+      if (mine) Object.assign(mine, t, { _local: false }); else state.tips.push(t);
+      renderRent();
     })
     .on("postgres_changes", { event: "*", schema: "public", table: "days" }, (p) => {
       if (p.new && p.new.day) { state.days[p.new.day] = p.new.lunch; render(); }

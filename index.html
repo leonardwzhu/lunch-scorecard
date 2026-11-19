@@ -298,10 +298,30 @@ footer { text-align: center; color: var(--muted); font-size: 0.8rem; }
   .tally .sub { margin-top: -6px; text-align: center; }
   .dist { width: 100%; }
 }
+/* ---------- rent jar ---------- */
+.rent { position: relative; overflow: hidden; }
+.rent-head { display: flex; flex-direction: column; gap: 8px; }
+.tag-small { font-size: 0.64rem; padding: 3px 8px; }
+.jar { display: flex; flex-direction: column; gap: 10px; background: var(--bg); border: 1.5px dashed var(--line); border-radius: 14px; padding: 16px; }
+.jar-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.jar-amt { font: 900 2.2rem/1 var(--display); font-variation-settings: "SOFT" 100; color: var(--caramel-deep); font-variant-numeric: tabular-nums; }
+.jar-of { color: var(--muted); font-size: 0.9rem; }
+.jar-bar { height: 16px; border-radius: 8px; background: var(--crumb); overflow: hidden; }
+.jar-bar i { display: block; height: 100%; width: 0; border-radius: 8px; background: repeating-linear-gradient(-45deg, var(--caramel) 0 10px, var(--cookie) 10px 20px); transition: width .6s cubic-bezier(.2,.9,.3,1.2); }
+.jar-milestone { margin: 0; display: flex; flex-direction: column; gap: 2px; font-weight: 600; }
+.chip:active:not(:disabled) { transform: scale(0.96); }
+.flying-cookie { position: fixed; width: 34px; height: 34px; pointer-events: none; z-index: 50; animation: fly .9s cubic-bezier(.3,.7,.4,1) forwards; }
+@keyframes fly { 0% { transform: translate(0,0) rotate(0) scale(1); opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) rotate(540deg) scale(.4); opacity: 0; } }
+.patrons { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.patrons li { display: grid; grid-template-columns: 1.6em 1fr auto; gap: 8px; align-items: center; font-size: 0.92rem; }
+.patrons .rk { font: 900 1rem var(--display); color: var(--caramel); }
+.patrons .ct { font: 500 0.8rem var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.patrons-title { margin-bottom: 6px; }
+
 /* ---------- layout: one column on phones, two on laptops ---------- */
 .cols { display: flex; flex-direction: column; gap: 24px; }
 .col { display: contents; } /* on phones the columns dissolve and the cards follow the order below */
-.o1 { order: 1; } .o2 { order: 2; } .o3 { order: 3; } .o4 { order: 4; } .o5 { order: 5; } .o6 { order: 6; }
+.o1 { order: 1; } .o2 { order: 2; } .o3 { order: 3; } .o4 { order: 4; } .o5 { order: 5; } .o6 { order: 6; } .o7 { order: 7; }
 .kbd-hint { display: none; }
 @media (min-width: 960px) {
   .wrap { max-width: 1180px; padding-block: 44px 80px; gap: 28px; }
@@ -324,6 +344,25 @@ footer { text-align: center; color: var(--muted); font-size: 0.8rem; }
   .wrap { max-width: 1240px; }
   .cols { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); }
 }
+/* ---------- rent fund ---------- */
+.o7 { order: 7; }
+.rent { flex-direction: row; align-items: center; gap: 22px; background: linear-gradient(135deg, var(--card), var(--caramel-soft)); }
+.rent-jar { flex: none; width: 92px; height: 110px; position: relative; border: 3px solid var(--caramel); border-top-width: 6px; border-radius: 14px 14px 22px 22px; background: color-mix(in srgb, var(--card) 60%, transparent); overflow: hidden; }
+.rent-jar::before { content: ""; position: absolute; left: 10px; right: 10px; top: -6px; height: 10px; background: var(--caramel-deep); border-radius: 4px; }
+.rent-jar span { position: absolute; inset: auto 6px 6px; display: flex; flex-wrap: wrap-reverse; justify-content: center; gap: 0; }
+.rent-jar svg { width: 30px; height: 30px; margin: -5px -3px; }
+.rent-jar svg:nth-child(2n) { transform: rotate(25deg); }
+.rent-jar svg:nth-child(3n) { transform: rotate(-30deg); }
+.rent-body { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.tag.small { font-size: 0.62rem; padding: 3px 8px; }
+.rent-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.rent-btn { display: inline-flex; flex-direction: column; align-items: flex-start; text-decoration: none; color: var(--ink); background: var(--card); border: 1.5px solid var(--line); border-radius: 12px; padding: 8px 14px; transition: border-color .15s, transform .15s; }
+.rent-btn:hover { border-color: var(--caramel); transform: translateY(-2px) rotate(-1deg); }
+.rent-btn strong { font: 800 1.1rem var(--display); font-variation-settings: "SOFT" 100; color: var(--caramel-deep); }
+.rent-btn span { font-size: 0.75rem; color: var(--muted); }
+.rent-fine { margin: 0; font-size: 0.75rem; color: var(--muted); }
+@media (min-width: 960px) { .rent { grid-column: 1 / -1; } }
+@media (max-width: 460px) { .rent { flex-direction: column; align-items: flex-start; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
 </head>
@@ -436,7 +475,8 @@ footer { text-align: center; color: var(--muted); font-size: 0.8rem; }
         <button class="iconbtn small" id="prevWeek" aria-label="Previous week">‹</button>
         <span class="eyebrow" id="weekLabel">This week</span>
         <button class="iconbtn small" id="nextWeek" aria-label="Next week">›</button>
-      </div>
+  
+    </div>
     </div>
     <div id="recapBody"><p class="empty-note">Loading…</p></div>
     <div class="voterow">
@@ -445,8 +485,28 @@ footer { text-align: center; color: var(--muted); font-size: 0.8rem; }
     </div>
     <pre id="recapText" hidden></pre>
   </section>
+  <section class="card o6 rent" id="rentCard" aria-labelledby="rentTitle" hidden>
+    <div class="rent-head">
+      <span class="tag tag-small">Totally real fundraiser</span>
+      <h2 id="rentTitle">Help pay Leonard's rent</h2>
+      <p class="empty-note" id="rentBlurb">Every cookie counts. No real money changes hands, and cookies have no cash value.</p>
     </div>
-  <section class="card o6 share" aria-labelledby="shareTitle">
+    <div class="jar">
+      <div class="jar-top">
+        <div><span class="jar-amt" id="rentAmt">$0</span> <span class="jar-of" id="rentOf">of $2,400 rent</span></div>
+        <span class="eyebrow" id="rentMonths"></span>
+      </div>
+      <div class="jar-bar" role="progressbar" aria-labelledby="rentTitle" id="rentBar" aria-valuemin="0"><i id="rentFill"></i></div>
+      <p class="jar-milestone"><span class="eyebrow">Leonard can now afford</span> <span id="rentMilestone">Nothing yet.</span></p>
+    </div>
+    <div class="voterow">
+      <button class="btn primary chip" id="rentBtn" type="button">Chip in a cookie 🍪</button>
+      <span class="status" id="rentStatus" role="status"></span>
+    </div>
+    <div id="rentPatrons"></div>
+  </section>
+    </div>
+  <section class="card o7 share" aria-labelledby="shareTitle">
     <h2 id="shareTitle">Post it in Teams</h2>
     <p class="empty-note">Copy this message into your Teams channel each day, or pin the page once as a channel tab.</p>
     <pre id="shareText"></pre>
@@ -455,6 +515,16 @@ footer { text-align: center; color: var(--muted); font-size: 0.8rem; }
       <span class="status" id="copyStatus" role="status"></span>
     </div>
   </section>
+    <section class="card o7 rent" id="rentFund" aria-labelledby="rentTitle" hidden>
+      <div class="rent-jar" aria-hidden="true"><span id="rentJar"></span></div>
+      <div class="rent-body">
+        <span class="tag small">Totally optional</span>
+        <h2 id="rentTitle"><span id="rentName">Leonard</span>'s Rent Fund</h2>
+        <p class="empty-note" id="rentPitch">Rent is due and the lunches are free. Coincidence? Toss a cookie's worth into the jar.</p>
+        <div class="rent-btns" id="rentBtns"></div>
+        <p class="rent-fine">Opens Venmo. 100% of proceeds go to rent, and 0% go toward a better lunch rating.</p>
+      </div>
+    </section>
   </main>
 
   <footer>Ratings refresh live while this page is open.</footer>
