@@ -601,27 +601,15 @@
     navigator.clipboard.writeText(text).then(() => { st.className = "status ok"; st.textContent = "Copied"; }, fallback);
   });
 
-  // ---------- rent fund: a joke tip jar with real Venmo links, shown only when a username is set ----------
-  (function rentFund() {
-    const rf = (window.LUNCH_CONFIG || {}).rentFund || {};
-    const user = String(rf.venmoUser || "").replace(/^@/, "").trim();
-    if (!/^[A-Za-z0-9_-]{2,40}$/.test(user)) return;
-    const name = String(rf.name || "Leonard").slice(0, 30);
-    $("rentName").textContent = name;
-    $("rentPitch").textContent = "Rent is due and the lunches are free. Coincidence? Toss a cookie's worth into " + name + "'s jar.";
-    const jar = $("rentJar"); for (let i = 0; i < 7; i++) jar.appendChild(cookieEl(true));
-    [[1, "One cookie", "a crumb of support"], [5, "A lunch tip", "covers a doorknob"], [20, "Patron of the arts", "basically a landlord"]].forEach(([amt, label, sub]) => {
-      const a = document.createElement("a");
-      a.className = "rent-btn";
-      a.href = "https://venmo.com/" + encodeURIComponent(user) + "?txn=pay&amount=" + amt + "&note=" + encodeURIComponent(name + "'s rent fund 🍪");
-      a.target = "_blank"; a.rel = "noopener noreferrer";
-      a.setAttribute("aria-label", "Send $" + amt + " to " + name + " on Venmo");
-      const st = document.createElement("strong"); st.textContent = "$" + amt + " · " + label;
-      const sp = document.createElement("span"); sp.textContent = sub;
-      a.append(st, sp); $("rentBtns").appendChild(a);
-    });
-    $("rentFund").hidden = false;
-  })();
+  // ---------- the rent joke: the button just asks ----------
+  $("rentJoke").addEventListener("click", (e) => {
+    e.stopPropagation();
+    const b = $("rentBubble"), open = b.hidden;
+    b.hidden = !open; $("rentJoke").setAttribute("aria-expanded", String(open));
+  });
+  document.addEventListener("click", (e) => {
+    if (!$("rentBubble").hidden && !e.target.closest(".hero-side")) { $("rentBubble").hidden = true; $("rentJoke").setAttribute("aria-expanded", "false"); }
+  });
 
   // ---------- boot ----------
   paintStars(); render();
