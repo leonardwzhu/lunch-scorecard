@@ -168,6 +168,47 @@ textarea { resize: vertical; min-height: 48px; }
 .voters .score svg { width: 15px; height: 15px; }
 
 .empty-note { color: var(--muted); font-size: 0.95rem; margin: 0; }
+.streak-line { margin: 0; font-weight: 600; color: var(--caramel-deep); }
+.streak-chip { display: inline-block; margin-left: 6px; font: 600 0.72rem var(--mono); color: var(--caramel-deep); background: var(--caramel-soft); border-radius: 999px; padding: 1px 7px; vertical-align: 1px; }
+
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.weeknav { display: flex; align-items: center; gap: 8px; color: var(--ink); }
+.weeknav .eyebrow { min-width: 9.5em; text-align: center; }
+.iconbtn.small { width: 30px; height: 30px; font-size: 1rem; border-color: var(--line); }
+.iconbtn.small:hover:not(:disabled) { background: var(--caramel-soft); }
+
+.podium { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.podium > div { border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.podium .best { background: var(--caramel-soft); }
+.podium .worst { background: color-mix(in srgb, var(--bad) 10%, transparent); }
+.podium .big-name { font: 800 1.25rem/1.15 var(--display); font-variation-settings: "SOFT" 100; overflow-wrap: anywhere; }
+.podium .detail { color: var(--muted); font-size: 0.85rem; }
+.quote { margin: 0; padding: 14px 16px; border-left: 4px solid var(--caramel); background: var(--bg); border-radius: 0 12px 12px 0; }
+.quote p { margin: 0 0 4px; font: 500 1.05rem/1.4 var(--display); font-variation-settings: "SOFT" 100; font-style: italic; overflow-wrap: anywhere; }
+.quote span { color: var(--muted); font-size: 0.85rem; }
+.awards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.awards li { border: 1.5px solid var(--line); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.awards .who { font-weight: 700; overflow-wrap: anywhere; }
+.awards .detail { color: var(--muted); font-size: 0.82rem; }
+.recap-foot { color: var(--muted); font-size: 0.85rem; margin: 0; }
+#recapBody { display: flex; flex-direction: column; gap: 14px; }
+
+.twin { display: flex; align-items: center; gap: 14px; background: var(--caramel-soft); border-radius: 14px; padding: 14px 16px; }
+.twin .pair { display: flex; flex: none; }
+.twin .pair svg { width: 40px; height: 40px; }
+.twin .pair svg + svg { margin-left: -12px; transform: rotate(18deg); }
+.twin .big-name { font: 800 1.3rem/1.15 var(--display); font-variation-settings: "SOFT" 100; overflow-wrap: anywhere; }
+.twin .detail { color: var(--muted); font-size: 0.88rem; }
+.alike { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.alike li { display: grid; grid-template-columns: minmax(0, 8em) 1fr 3.2em; gap: 10px; align-items: center; font-size: 0.9rem; }
+.alike .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.alike .bar { height: 10px; border-radius: 5px; background: var(--crumb); overflow: hidden; }
+.alike .bar i { display: block; height: 100%; border-radius: 5px; background: linear-gradient(90deg, var(--caramel), var(--cookie)); }
+.alike .pct { font: 500 0.8rem var(--mono); text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+#tasteBody { display: flex; flex-direction: column; gap: 14px; }
+@media (max-width: 460px) {
+  .podium, .awards { grid-template-columns: 1fr; }
+}
 .linkbtn.subtle { color: var(--muted); font-weight: 500; }
 .away { border-top: 1.5px dashed var(--line); padding-top: 16px; }
 .away-confirm { display: flex; flex-direction: column; gap: 12px; }
@@ -292,6 +333,7 @@ footer { text-align: center; color: var(--muted); font-size: 0.8rem; }
           </div>
         </div>
       </div>
+      <p class="streak-line" id="streakLine" hidden></p>
       <div class="away-note" id="awayNote" hidden>
         <strong>You were out of the office for this lunch.</strong>
         You can see the results below, but you can't rate it.
@@ -309,6 +351,28 @@ footer { text-align: center; color: var(--muted); font-size: 0.8rem; }
     <div id="boardBody" class="scroll"><p class="empty-note">Loading…</p></div>
   </section>
 
+  <section class="card" aria-labelledby="recapTitle">
+    <div class="card-head">
+      <h2 id="recapTitle">Friday recap</h2>
+      <div class="weeknav">
+        <button class="iconbtn small" id="prevWeek" aria-label="Previous week">‹</button>
+        <span class="eyebrow" id="weekLabel">This week</span>
+        <button class="iconbtn small" id="nextWeek" aria-label="Next week">›</button>
+      </div>
+    </div>
+    <div id="recapBody"><p class="empty-note">Loading…</p></div>
+    <div class="voterow">
+      <button class="btn ghost" id="copyRecap" type="button">Copy recap for Teams</button>
+      <span class="status" id="recapStatus" role="status"></span>
+    </div>
+    <pre id="recapText" hidden></pre>
+  </section>
+
+  <section class="card" aria-labelledby="tasteTitle">
+    <h2 id="tasteTitle">Taste twins</h2>
+    <div id="tasteBody"><p class="empty-note">Loading…</p></div>
+  </section>
+
   <section class="card share" aria-labelledby="shareTitle">
     <h2 id="shareTitle">Post it in Teams</h2>
     <p class="empty-note">Copy this message into your Teams channel each day, or pin the page once as a channel tab.</p>
@@ -323,6 +387,7 @@ footer { text-align: center; color: var(--muted); font-size: 0.8rem; }
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
+<script src="insights.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

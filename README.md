@@ -42,6 +42,11 @@ Open the page and use **Copy message** at the bottom to get a ready-to-post mess
 - **Agree or disagree:** anyone who can see a day's results can up- or down-vote other people's ratings (not their own). Tap the same arrow again to take your vote back. The most agreed-with ratings show first.
 - **Leaderboard:** lunches with the same name are grouped together across days and ranked by average cookies. Lunches with 3 or more ratings get a "crowd favorite" tag at 4.5 and up, or "retire it" below 2.5.
 
+- **Streaks:** 🔥 shows how many lunches in a row someone has rated or marked themselves out of office. Missing a lunch resets it; weekends never count.
+- **Friday recap:** lunch of the week, biggest letdown, comment of the week (most up votes), and awards for hottest streak, most agreed-with, harshest critic, easiest to please and contrarian. **Copy recap for Teams** gives a ready-to-post summary. Early in the week it shows last week's recap.
+- **Taste twins:** once you've rated a couple of lunches, see whose ratings are closest to yours, and the most alike pair in the office.
+- **Weekdays only:** the date arrows skip Saturday and Sunday, and on a weekend the page opens on Friday's lunch.
+
 ## Good to know
 
 - **Votes are tied to a browser, not a login.** Someone on two devices counts as two voters, and clearing site data starts them over as a new voter. That's fine for a lunch poll, but it isn't secure voting.

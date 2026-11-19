@@ -43,8 +43,13 @@
 
   const today = ymd(new Date());
   const earliestVoteDay = shift(today, -MAX_BACK_DAYS);
+  // Work lunches only: weekends are skipped everywhere.
+  const isWeekend = (d) => { const w = parseYmd(d).getDay(); return w === 0 || w === 6; };
+  function stepWorkday(d, dir) { do { d = shift(d, dir); } while (isWeekend(d)); return d; }
+  const lunchToday = isWeekend(today) ? stepWorkday(today, -1) : today; // on a weekend, Friday's lunch
+  function mondayOf(d) { const w = parseYmd(d).getDay(); return shift(d, w === 0 ? -6 : 1 - w); }
   const state = {
-    day: today, sb: null,
+    day: lunchToday, sb: null, recapMonday: mondayOf(lunchToday), ins: null,
     days: {},    // date -> lunch name
     votes: [],   // rows from the votes table
     absences: [],   // who was out of the office, per day
@@ -113,9 +118,9 @@
     $("voteStatus").textContent = ""; $("voteStatus").className = "status";
     render();
   }
-  $("prevDay").addEventListener("click", () => setDay(shift(state.day, -1)));
-  $("nextDay").addEventListener("click", () => { if (state.day < today) setDay(shift(state.day, 1)); });
-  $("goToday").addEventListener("click", () => setDay(today));
+  $("prevDay").addEventListener("click", () => setDay(stepWorkday(state.day, -1)));
+  $("nextDay").addEventListener("click", () => { const n = stepWorkday(state.day, 1); if (n <= today) setDay(n); });
+  $("goToday").addEventListener("click", () => setDay(lunchToday));
 
   // ---------- lunch name ----------
   $("editLunch").addEventListener("click", () => {
@@ -242,11 +247,11 @@
   }
 
   function render() {
-    const isToday = state.day === today;
-    $("dateLabel").textContent = isToday ? "Today · " + pretty(state.day, { month: "short", day: "numeric" }) : pretty(state.day);
-    $("nextDay").disabled = state.day >= today;
+    const isToday = state.day === lunchToday;
+    $("dateLabel").textContent = isToday && lunchToday === today ? "Today · " + pretty(state.day, { month: "short", day: "numeric" }) : pretty(state.day);
+    $("nextDay").disabled = stepWorkday(state.day, 1) > today;
     $("goToday").hidden = isToday;
-    $("lunchEyebrow").textContent = isToday ? "On the menu today" : "On the menu that day";
+    $("lunchEyebrow").textContent = isToday && lunchToday === today ? "On the menu today" : "On the menu that day";
 
     const lunch = state.days[state.day];
     const nameEl = $("lunchName");
@@ -257,7 +262,8 @@
     $("editLunch").hidden = state.editing || !state.sb;
     $("editLunch").textContent = lunch ? "Change name" : "Name this lunch";
 
-    renderAway(); renderTally(); renderBoard(); renderShare();
+    computeInsights();
+    renderAway(); renderStreak(); renderTally(); renderBoard(); renderRecap(); renderTaste(); renderShare();
   }
 
   function renderTally() {
@@ -296,6 +302,8 @@
       const sc = document.createElement("div"); sc.className = "score";
       for (let k = 1; k <= 5; k++) sc.appendChild(cookieEl(k <= r.stars, { dots: false }));
       sc.setAttribute("role", "img"); sc.setAttribute("aria-label", r.stars + " out of 5 cookies");
+      const st = state.ins ? state.ins.streakFor(r.voter_id, r.voter_name) : 0;
+      if (st >= 2) { const c = document.createElement("span"); c.className = "streak-chip"; c.textContent = "🔥 " + st; c.title = st + " lunches in a row"; who.appendChild(c); }
       li.append(avatar(r.voter_name, r.voter_id), mid, sc); list.appendChild(li);
     });
   }
@@ -364,10 +372,149 @@
     if (hiddenNote) body.insertAdjacentHTML("beforeend", hiddenNote);
   }
 
+  // ---------- streaks, recap, taste twins (see insights.js) ----------
+  function computeInsights() {
+    if (!state.loaded || !window.LunchInsights) { state.ins = null; return; }
+    const workdays = (d) => !isWeekend(d);
+    const days = {}; Object.keys(state.days).filter(workdays).forEach((d) => { days[d] = state.days[d]; });
+    state.ins = LunchInsights.build({
+      votes: state.votes.filter((v) => workdays(v.day)),
+      absences: state.absences.filter((a) => workdays(a.day)),
+      reactions: state.reactions, days, myId: voterId, today, isHidden: resultsHidden,
+    });
+  }
+
+  function renderStreak() {
+    const el = $("streakLine"); const ins = state.ins;
+    const n = ins ? ins.myStreak : 0;
+    const doneToday = myVote(lunchToday) || myAbsence(lunchToday);
+    if (!n || state.day !== lunchToday) { el.hidden = true; return; }
+    el.hidden = false;
+    el.textContent = doneToday
+      ? "🔥 You're on a " + n + "-lunch streak. Out-of-office days count too."
+      : "🔥 Rate " + (lunchToday === today ? "today's" : pretty(lunchToday, { weekday: "long" }) + "'s") + " lunch (or mark yourself out) to keep your " + n + "-lunch streak going.";
+  }
+
+  const weekDates = (monday) => [0, 1, 2, 3, 4].map((i) => shift(monday, i));
+  const lunchNameOf = (d) => state.days[d] || "Unnamed lunch";
+  const short = (d) => pretty(d, { weekday: "short", month: "short", day: "numeric" });
+  $("prevWeek").addEventListener("click", () => { state.recapPicked = true; state.recapMonday = shift(state.recapMonday, -7); renderRecap(); });
+  $("nextWeek").addEventListener("click", () => { state.recapPicked = true; if (state.recapMonday < mondayOf(lunchToday)) { state.recapMonday = shift(state.recapMonday, 7); renderRecap(); } });
+
+  function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+
+  function renderRecap() {
+    const body = $("recapBody"), ins = state.ins, monday = state.recapMonday;
+    const thisWeek = monday === mondayOf(lunchToday);
+    $("weekLabel").textContent = thisWeek ? "This week" : "Week of " + pretty(monday, { month: "short", day: "numeric" });
+    $("nextWeek").disabled = thisWeek;
+    $("recapStatus").textContent = ""; $("recapText").hidden = true;
+    if (!state.loaded || !ins) return;
+    const r = ins.recap(monday, weekDates(monday), lunchNameOf, false);
+    // Early in the week there's nothing to recap yet, so start on last week instead.
+    if (!state.recapPicked && thisWeek && !r.lunches && !r.hiddenCount) { state.recapPicked = true; state.recapMonday = shift(monday, -7); return renderRecap(); }
+    state.recapPicked = true;
+    $("copyRecap").hidden = !r.lunches;
+    body.replaceChildren();
+    if (!r.lunches) {
+      body.appendChild(el("p", "empty-note", r.hiddenCount
+        ? "Rate this week's lunches (or mark yourself out) to see the recap."
+        : "No lunches were rated this week."));
+      return;
+    }
+    if (r.best) {
+      const pod = el("div", "podium");
+      const card = (cls, label, x) => { const d = el("div", cls); d.append(el("span", "eyebrow", label), el("span", "big-name", x.name), el("span", "detail", x.avg.toFixed(1) + " cookies · " + short(x.day))); return d; };
+      pod.appendChild(card("best", "Lunch of the week", r.best));
+      if (r.worst) pod.appendChild(card("worst", "Biggest letdown", r.worst));
+      body.appendChild(pod);
+    }
+    if (r.comment) {
+      const q = el("blockquote", "quote");
+      q.append(el("p", null, "\u201C" + r.comment.text + "\u201D"), el("span", null, r.comment.by + " · +" + r.comment.score + " · comment of the week"));
+      body.appendChild(q);
+    }
+    const awards = [
+      r.hot && [r.hot.names.length > 1 ? "Hottest streaks" : "Hottest streak", r.hot.name, "🔥 " + r.hot.n + " lunches in a row"],
+      r.agreed && ["Most agreed-with", r.agreed.name, "+" + r.agreed.score + " from coworkers"],
+      r.harshest && ["Harshest critic", r.harshest.name, "Averaged " + r.harshest.avg.toFixed(1) + " cookies"],
+      r.easiest && ["Easiest to please", r.easiest.name, "Averaged " + r.easiest.avg.toFixed(1) + " cookies"],
+      r.contrarian && ["Contrarian", r.contrarian.name, r.contrarian.off.toFixed(1) + " cookies off the group, on average"],
+    ].filter(Boolean);
+    if (awards.length) {
+      const ul = el("ul", "awards");
+      awards.forEach(([label, who, detail]) => { const li = el("li"); li.append(el("span", "eyebrow", label), el("span", "who", who), el("span", "detail", detail)); ul.appendChild(li); });
+      body.appendChild(ul);
+    }
+    let foot = r.lunches + " lunch" + (r.lunches > 1 ? "es" : "") + " · " + r.ratings + " rating" + (r.ratings === 1 ? "" : "s") + (r.outCount ? " · " + r.outCount + " out of office" : "");
+    if (r.hiddenCount) foot += ". " + r.hiddenCount + " more lunch" + (r.hiddenCount > 1 ? "es join" : " joins") + " once you've rated " + (r.hiddenCount > 1 ? "them" : "it") + ".";
+    body.appendChild(el("p", "recap-foot", foot));
+  }
+
+  function recapForTeams() {
+    const monday = state.recapMonday;
+    const r = state.ins.recap(monday, weekDates(monday), lunchNameOf, true);
+    const L = ["🍪 Lunch recap · week of " + pretty(monday, { month: "short", day: "numeric" })];
+    if (r.best) L.push("🏆 Lunch of the week: " + r.best.name + " (" + r.best.avg.toFixed(1) + ")");
+    if (r.worst) L.push("😬 Biggest letdown: " + r.worst.name + " (" + r.worst.avg.toFixed(1) + ")");
+    if (r.comment) L.push("💬 Comment of the week: \u201C" + r.comment.text + "\u201D (" + r.comment.by + ", +" + r.comment.score + ")");
+    if (r.hot) L.push("🔥 Hottest streak: " + r.hot.name + " (" + r.hot.n + " lunches in a row)");
+    if (r.agreed) L.push("👍 Most agreed-with: " + r.agreed.name + " (+" + r.agreed.score + ")");
+    if (r.harshest) L.push("🧐 Harshest critic: " + r.harshest.name + " (avg " + r.harshest.avg.toFixed(1) + ")");
+    if (r.easiest) L.push("🥰 Easiest to please: " + r.easiest.name + " (avg " + r.easiest.avg.toFixed(1) + ")");
+    if (r.contrarian) L.push("🙃 Contrarian: " + r.contrarian.name);
+    const pair = state.ins.taste.closestPair;
+    if (pair) L.push("👯 Taste twins: " + pair.aReal + " & " + pair.bReal + " (" + similarity(pair.gap) + "% alike)");
+    L.push(r.lunches + " lunches · " + r.ratings + " ratings" + (r.outCount ? " · " + r.outCount + " out of office" : ""));
+    L.push("Rate today's lunch: " + location.href.split("#")[0].split("?")[0]);
+    return L.join("\n");
+  }
+  $("copyRecap").addEventListener("click", () => {
+    if (!state.ins) return;
+    const text = recapForTeams(), st = $("recapStatus"), pre = $("recapText");
+    pre.textContent = text;
+    const fallback = () => { pre.hidden = false; const rg = document.createRange(); rg.selectNodeContents(pre); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(rg); st.className = "status"; st.textContent = "Text selected. Press Ctrl+C to copy."; };
+    if (!navigator.clipboard) return fallback();
+    navigator.clipboard.writeText(text).then(() => { st.className = "status ok"; st.textContent = "Copied. Paste it in Teams."; }, fallback);
+  });
+
+  const similarity = (gap) => Math.round((1 - gap / 4) * 100);
+  function renderTaste() {
+    const body = $("tasteBody"), ins = state.ins;
+    if (!state.loaded || !ins) return;
+    const t = ins.taste;
+    body.replaceChildren();
+    if (t.twin) {
+      const box = el("div", "twin");
+      const pair = el("span", "pair"); pair.append(cookieEl(true), cookieEl(true));
+      const txt = el("div"); txt.append(el("span", "eyebrow", "Your taste twin"), el("div", "big-name", t.twin.name),
+        el("div", "detail", similarity(t.twin.gap) + "% alike across " + t.twin.shared + " lunches you both rated"));
+      box.append(pair, txt); body.appendChild(box);
+      if (t.mine.length > 1) {
+        const ul = el("ul", "alike");
+        t.mine.forEach((m) => {
+          const li = el("li"); const bar = el("span", "bar"); const fill = el("i"); fill.style.width = similarity(m.gap) + "%"; bar.appendChild(fill);
+          li.append(el("span", "nm", m.name), bar, el("span", "pct", similarity(m.gap) + "%"));
+          li.title = m.shared + " lunches in common"; ul.appendChild(li);
+        });
+        body.appendChild(ul);
+      }
+      if (t.opposite && t.opposite.gap > t.twin.gap) body.appendChild(el("p", "empty-note", "Least alike: " + t.opposite.name + ". You two rarely agree."));
+    } else {
+      body.appendChild(el("p", "empty-note", t.myRated >= 2
+        ? "Nobody has rated the same two lunches as you yet. Check back after a few more lunches."
+        : "Rate at least two lunches to find out who in the office shares your taste."));
+    }
+    if (t.closestPair) {
+      const p = t.closestPair;
+      body.appendChild(el("p", "recap-foot", "Most alike in the office: " + p.a + " & " + p.b + " (" + similarity(p.gap) + "% alike over " + p.shared + " lunches)."));
+    }
+  }
+
   function renderShare() {
     const cfg = window.LUNCH_CONFIG || {};
-    const lunch = state.days[today];
-    $("shareText").textContent = "🍽️ Lunch poll for " + pretty(today) + (cfg.teamName ? " (" + cfg.teamName + ")" : "") +
+    const lunch = state.days[lunchToday];
+    $("shareText").textContent = "🍽️ Lunch poll for " + pretty(lunchToday) + (cfg.teamName ? " (" + cfg.teamName + ")" : "") +
       (lunch ? ": " + lunch : "") + "\nHow was it? Rate it 1–5 cookies here: " + location.href.split("#")[0].split("?")[0];
   }
   $("copyShare").addEventListener("click", () => {
