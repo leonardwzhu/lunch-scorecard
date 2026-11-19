@@ -45,6 +45,7 @@ Open the page and use **Copy message** at the bottom to get a ready-to-post mess
 - **Streaks:** 🔥 shows how many lunches in a row someone has rated or marked themselves out of office. Missing a lunch resets it; days without an office lunch never count.
 - **Weekly recap:** lunch of the week, biggest letdown, comment of the week (most up votes), and awards for hottest streak, most agreed-with, harshest critic, easiest to please and contrarian. **Copy recap for Teams** gives a ready-to-post summary. Early in the week it shows last week's recap.
 - **Taste twins:** once you've rated a couple of lunches, see whose ratings are closest to yours, and the most alike pair in the office.
+- **Calendar:** tap the date in the caramel bar to open a month view of lunch days, showing each lunch's name and whether you rated it, were out, or still need to. Tap a day to jump to it.
 - **Lunch days only:** lunch is Monday to Thursday (change `lunchWeekdays` in `config.js` if that changes). The date arrows skip other days, and on Friday or the weekend the page opens on Thursday's lunch.
 
 ## Good to know

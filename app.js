@@ -113,6 +113,73 @@
   }
 
   // ---------- day navigation ----------
+  // ---------- calendar ----------
+  const monthStart = (d) => d.slice(0, 8) + "01";
+  function shiftMonth(m, n) { const d = parseYmd(m); d.setMonth(d.getMonth() + n, 1); return ymd(d); }
+  function earliestMonth() {
+    const all = [...Object.keys(state.days), ...state.votes.map((v) => v.day)].sort();
+    return monthStart(all[0] || lunchToday);
+  }
+  $("dateLabel").addEventListener("click", () => {
+    state.calOpen = !state.calOpen;
+    if (state.calOpen) state.calMonth = monthStart(state.day);
+    renderCal();
+    if (state.calOpen) { const sel = document.querySelector(".cal-day.selected") || document.querySelector(".cal-day:not(:disabled)"); if (sel) sel.focus(); }
+  });
+  $("calPrev").addEventListener("click", () => { state.calMonth = shiftMonth(state.calMonth, -1); renderCal(); });
+  $("calNext").addEventListener("click", () => { state.calMonth = shiftMonth(state.calMonth, 1); renderCal(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && state.calOpen) { state.calOpen = false; renderCal(); $("dateLabel").focus(); } });
+
+  function renderCal() {
+    const cal = $("cal"), btn = $("dateLabel");
+    cal.hidden = !state.calOpen; btn.setAttribute("aria-expanded", String(!!state.calOpen));
+    if (!state.calOpen) return;
+    const m = state.calMonth || monthStart(state.day);
+    $("calMonth").textContent = parseYmd(m).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+    $("calPrev").disabled = m <= earliestMonth();
+    $("calNext").disabled = m >= monthStart(today);
+
+    const cols = LUNCH_WEEKDAYS.slice().sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)); // Monday first
+    const grid = $("calGrid");
+    grid.style.gridTemplateColumns = "repeat(" + cols.length + ", minmax(0, 1fr))";
+    grid.replaceChildren();
+    cols.forEach((w) => {
+      const h = document.createElement("div"); h.className = "cal-dow"; h.setAttribute("role", "columnheader");
+      const sample = new Date(2024, 0, 1 + ((w + 6) % 7)); // Jan 1 2024 was a Monday
+      h.textContent = sample.toLocaleDateString(undefined, { weekday: "short" });
+      grid.appendChild(h);
+    });
+    const month = m.slice(0, 7);
+    const lastDay = shift(shiftMonth(m, 1), -1);
+    for (let mon = mondayOf(m); mon <= lastDay; mon = shift(mon, 7)) {
+      if (!cols.some((w) => shift(mon, (w + 6) % 7).slice(0, 7) === month)) continue; // week has no lunch days this month
+      cols.forEach((w) => {
+        const d = shift(mon, (w + 6) % 7);
+        if (d.slice(0, 7) !== month) { const pad = document.createElement("div"); pad.className = "cal-pad"; grid.appendChild(pad); return; }
+        const b = document.createElement("button"); b.type = "button"; b.className = "cal-day";
+        const future = d > today;
+        const lunch = state.days[d];
+        const rated = myVote(d), out = myAbsence(d);
+        const hasData = !!lunch || state.votes.some((v) => v.day === d) || state.absences.some((a) => a.day === d);
+        const todo = !rated && !out && votingOpen(d) && !future && (hasData || d === lunchToday);
+        if (rated) b.classList.add("rated"); else if (out) b.classList.add("out"); else if (todo) b.classList.add("todo");
+        if (!hasData && !future && d !== lunchToday) b.classList.add("quiet");
+        if (d === lunchToday) b.classList.add("today");
+        if (d === state.day) { b.classList.add("selected"); b.setAttribute("aria-current", "date"); }
+        b.disabled = future;
+        const n = document.createElement("span"); n.className = "n"; n.textContent = parseYmd(d).getDate();
+        const nm = document.createElement("span"); nm.className = "nm"; nm.textContent = lunch || (hasData ? "Unnamed" : "");
+        const mark = document.createElement("i"); mark.className = "mark";
+        b.append(n, nm, mark);
+        const status = rated ? "you rated it " + rated.stars + " out of 5" : out ? "you were out of the office" : todo ? "you haven't rated it yet" : future ? "coming up" : !hasData ? "no ratings" : "voting closed";
+        b.setAttribute("aria-label", pretty(d) + ", " + (lunch || "no lunch named") + ", " + status);
+        b.title = (lunch || "No lunch named") + " · " + status.charAt(0).toUpperCase() + status.slice(1);
+        b.addEventListener("click", () => { state.calOpen = false; setDay(d); renderCal(); $("dateLabel").focus(); });
+        grid.appendChild(b);
+      });
+    }
+  }
+
   function setDay(d) {
     state.day = d; state.editing = false; state.confirmingAway = false;
     loadMyVoteIntoForm();
@@ -264,7 +331,7 @@
     $("editLunch").textContent = lunch ? "Change name" : "Name this lunch";
 
     computeInsights();
-    renderAway(); renderStreak(); renderTally(); renderBoard(); renderRecap(); renderTaste(); renderShare();
+    renderCal(); renderAway(); renderStreak(); renderTally(); renderBoard(); renderRecap(); renderTaste(); renderShare();
   }
 
   function renderTally() {
