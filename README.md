@@ -37,7 +37,7 @@ Open the page and use **Copy message** at the bottom to get a ready-to-post mess
 ## How it works
 
 - **Name the lunch:** whoever gets there first types in what was served. Anyone can fix a typo.
-- **Rate it:** 1–5 stars plus an optional comment. People can change their rating, and can rate lunches from up to a week back.
+- **Rate it:** 1–5 cookies plus an optional comment. Results for a lunch stay hidden until you rate it (once its week-long voting window closes, anyone can see them). People can change their rating, and can rate lunches from up to a week back.
 - **Leaderboard:** lunches with the same name are grouped together across days and ranked by average stars. Lunches with 3 or more ratings get a "crowd favorite" tag at 4.5 and up, or "retire it" below 2.5.
 
 ## Good to know

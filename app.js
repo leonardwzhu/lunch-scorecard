@@ -65,7 +65,10 @@
     b.addEventListener("mouseleave", () => paintStars());
     starsEl.appendChild(b);
   }
-  function canVoteDay() { return state.day >= earliestVoteDay && state.day <= today; }
+  function votingOpen(d) { return d >= earliestVoteDay && d <= today; }
+  function canVoteDay() { return votingOpen(state.day); }
+  // Results stay hidden until you've rated that day (once voting closes, anyone can see them).
+  function resultsHidden(d) { return votingOpen(d) && !myVote(d); }
   function paintStars(hover) {
     const v = hover || state.pick;
     for (let i = 1; i <= 5; i++) {
@@ -196,6 +199,13 @@
     const body = $("tallyBody");
     if (!state.loaded) return;
     const rs = ratingsFor(state.day);
+    if (resultsHidden(state.day)) {
+      const n = rs.length;
+      body.innerHTML = '<div class="locked">' + cookie(false) + '<div><p class="locked-title">Rate it to see the results</p><p class="empty-note">' +
+        (n ? n + (n === 1 ? " coworker has" : " coworkers have") + " rated this lunch. Results appear once you've added yours."
+           : "Nobody has rated this lunch yet. Be the first to tap a cookie above.") + "</p></div></div>";
+      return;
+    }
     if (!rs.length) { body.innerHTML = '<p class="empty-note">No ratings for this day yet. Be the first to tap a cookie above.</p>'; return; }
     const counts = [0, 0, 0, 0, 0, 0]; rs.forEach((r) => counts[r.stars]++);
     const max = Math.max(...counts);
@@ -224,8 +234,10 @@
     if (!state.loaded) return;
     const groups = {};
     const allDays = new Set([...Object.keys(state.days), ...state.votes.map((v) => v.day)]);
+    let hiddenDays = 0;
     allDays.forEach((d) => {
       const rs = ratingsFor(d); if (!rs.length) return;
+      if (resultsHidden(d)) { hiddenDays++; return; }
       const name = state.days[d] || "Unnamed lunch";
       const key = name.trim().toLowerCase();
       const g = groups[key] || (groups[key] = { name, days: [], ratings: [] });
@@ -233,7 +245,8 @@
     });
     const rows = Object.values(groups).map((g) => ({ ...g, avg: avg(g.ratings) }))
       .sort((a, b) => b.avg - a.avg || b.ratings.length - a.ratings.length);
-    if (!rows.length) { body.innerHTML = '<p class="empty-note">Lunches show up here, ranked by average cookies, once people start rating them.</p>'; return; }
+    const hiddenNote = hiddenDays ? '<p class="empty-note board-note">' + (hiddenDays === 1 ? "1 recent lunch joins" : hiddenDays + " recent lunches join") + " the leaderboard once you've rated " + (hiddenDays === 1 ? "it" : "them") + ".</p>" : "";
+    if (!rows.length) { body.innerHTML = '<p class="empty-note">Lunches show up here, ranked by average cookies, once people start rating them.</p>' + hiddenNote; return; }
     const table = document.createElement("table"); table.className = "board";
     table.innerHTML = '<thead><tr><th>#</th><th>Lunch</th><th style="text-align:right">Avg</th></tr></thead>';
     const tb = document.createElement("tbody");
@@ -254,6 +267,7 @@
     });
     table.appendChild(tb);
     body.replaceChildren(table);
+    if (hiddenNote) body.insertAdjacentHTML("beforeend", hiddenNote);
   }
 
   function renderShare() {

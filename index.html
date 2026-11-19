@@ -168,6 +168,11 @@ textarea { resize: vertical; min-height: 48px; }
 .voters .score svg { width: 15px; height: 15px; }
 
 .empty-note { color: var(--muted); font-size: 0.95rem; margin: 0; }
+.locked { display: flex; align-items: center; gap: 18px; padding: 18px; border: 1.5px dashed var(--line); border-radius: 14px; background: var(--bg); }
+.locked svg { width: 64px; height: 64px; flex: none; transform: rotate(-8deg); }
+.locked > div { min-width: 0; }
+.locked-title { margin: 0 0 2px; font: 700 1.1rem var(--display); font-variation-settings: "SOFT" 100; color: var(--caramel-deep); }
+.board-note { margin-top: 12px; font-size: 0.85rem; }
 
 /* ---------- leaderboard ---------- */
 .board { width: 100%; border-collapse: collapse; }
@@ -210,7 +215,7 @@ footer { text-align: center; color: var(--muted); font-size: 0.8rem; }
     <div class="text">
       <span class="tag">Daily lunch poll</span>
       <h1>Lunch Scorecard</h1>
-      <p>How was lunch? Give it 1 to 5 cookies. You can change your rating any time today.</p>
+      <p>How was lunch? Give it 1 to 5 cookies to see what everyone else thought. You can change your rating any time today.</p>
     </div>
     <span id="heroCookie" aria-hidden="true"></span>
   </header>
