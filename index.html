@@ -168,6 +168,18 @@ textarea { resize: vertical; min-height: 48px; }
 .voters .score svg { width: 15px; height: 15px; }
 
 .empty-note { color: var(--muted); font-size: 0.95rem; margin: 0; }
+.linkbtn.subtle { color: var(--muted); font-weight: 500; }
+.away { border-top: 1.5px dashed var(--line); padding-top: 16px; }
+.away-confirm { display: flex; flex-direction: column; gap: 12px; }
+.away-confirm p { margin: 0; color: var(--ink); }
+.away-note { background: var(--caramel-soft); border-radius: 12px; padding: 14px 16px; color: var(--ink); }
+.react { display: flex; gap: 6px; margin-top: 6px; }
+.react-btn { display: inline-flex; align-items: center; gap: 4px; border: 1.5px solid var(--line); background: transparent; color: var(--muted); border-radius: 999px; padding: 2px 10px 2px 7px; font: 600 0.8rem var(--mono); font-variant-numeric: tabular-nums; cursor: pointer; transition: border-color .15s, background .15s, color .15s; }
+.react-btn svg { width: 12px; height: 12px; fill: currentColor; }
+.react-btn:hover:not(:disabled) { border-color: var(--caramel); color: var(--ink); }
+.react-btn.up.mine { background: var(--caramel-soft); border-color: var(--caramel); color: var(--caramel-deep); }
+.react-btn.down.mine { background: color-mix(in srgb, var(--bad) 12%, transparent); border-color: var(--bad); color: var(--bad); }
+.react-btn:disabled { cursor: default; opacity: 0.55; }
 .locked { display: flex; align-items: center; gap: 18px; padding: 18px; border: 1.5px dashed var(--line); border-radius: 14px; background: var(--bg); }
 .locked svg { width: 64px; height: 64px; flex: none; transform: rotate(-8deg); }
 .locked > div { min-width: 0; }
@@ -258,6 +270,22 @@ footer { text-align: center; color: var(--muted); font-size: 0.8rem; }
           <span class="status" id="voteStatus" role="status"></span>
         </div>
       </form>
+
+      <div class="away" id="awayBox" hidden>
+        <button class="linkbtn subtle" id="awayBtn" type="button">I wasn't in the office for this lunch</button>
+        <div class="away-confirm" id="awayConfirm" hidden>
+          <p>You won't be able to rate this lunch, but you'll see everyone's results. This can't be undone.</p>
+          <div class="voterow">
+            <button class="btn primary" id="awayYes" type="button">Yes, I was out</button>
+            <button class="btn ghost" id="awayNo" type="button">Cancel</button>
+            <span class="status err" id="awayMsg" role="status"></span>
+          </div>
+        </div>
+      </div>
+      <div class="away-note" id="awayNote" hidden>
+        <strong>You were out of the office for this lunch.</strong>
+        You can see the results below, but you can't rate it.
+      </div>
     </div>
   </section>
 

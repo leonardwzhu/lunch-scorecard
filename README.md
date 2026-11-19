@@ -9,7 +9,7 @@ It's a static site (GitHub Pages) with a free [Supabase](https://supabase.com) d
 ### 1. Create the database
 
 1. Sign up at [supabase.com](https://supabase.com) and create a new project. The free plan is enough.
-2. In the project, open **SQL Editor → New query**, paste in the contents of [`supabase/schema.sql`](supabase/schema.sql), and click **Run**.
+2. In the project, open **SQL Editor → New query**, paste in the contents of [`supabase/schema.sql`](supabase/schema.sql), and click **Run**. Then do the same with [`supabase/002_out_of_office_and_rating_votes.sql`](supabase/002_out_of_office_and_rating_votes.sql).
 3. Open **Project Settings → API** and copy the **Project URL** and the **anon public** key.
 
 ### 2. Connect the page
@@ -38,6 +38,8 @@ Open the page and use **Copy message** at the bottom to get a ready-to-post mess
 
 - **Name the lunch:** whoever gets there first types in what was served. Anyone can fix a typo.
 - **Rate it:** 1–5 cookies plus an optional comment. Results for a lunch stay hidden until you rate it (once its week-long voting window closes, anyone can see them). People can change their rating, and can rate lunches from up to a week back.
+- **Out of office:** if you missed lunch, tap **I wasn't in the office for this lunch**. You can then see the results but can't rate that lunch, and this can't be undone.
+- **Agree or disagree:** anyone who can see a day's results can up- or down-vote other people's ratings (not their own). Tap the same arrow again to take your vote back. The most agreed-with ratings show first.
 - **Leaderboard:** lunches with the same name are grouped together across days and ranked by average cookies. Lunches with 3 or more ratings get a "crowd favorite" tag at 4.5 and up, or "retire it" below 2.5.
 
 ## Good to know

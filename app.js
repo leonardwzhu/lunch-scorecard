@@ -47,7 +47,10 @@
     day: today, sb: null,
     days: {},    // date -> lunch name
     votes: [],   // rows from the votes table
-    loaded: false, pick: 0, dirty: false, editing: false,
+    absences: [],   // who was out of the office, per day
+    reactions: [],  // up/down votes on people's ratings
+    extras: true,   // false until the 002 SQL has been run in Supabase
+    loaded: false, pick: 0, dirty: false, editing: false, confirmingAway: false,
   };
 
   // ---------- stars ----------
@@ -68,7 +71,8 @@
   function votingOpen(d) { return d >= earliestVoteDay && d <= today; }
   function canVoteDay() { return votingOpen(state.day); }
   // Results stay hidden until you've rated that day (once voting closes, anyone can see them).
-  function resultsHidden(d) { return votingOpen(d) && !myVote(d); }
+  function resultsHidden(d) { return votingOpen(d) && !myVote(d) && !myAbsence(d); }
+  const myAbsence = (day) => state.absences.find((a) => a.day === day && a.voter_id === voterId);
   function paintStars(hover) {
     const v = hover || state.pick;
     for (let i = 1; i <= 5; i++) {
@@ -76,7 +80,7 @@
       b.classList.toggle("on", i <= v);
       b.firstChild.classList.toggle("off", i > v);
       b.setAttribute("aria-checked", String(i === state.pick));
-      b.disabled = !state.sb || !canVoteDay();
+      b.disabled = !state.sb || !canVoteDay() || !!myAbsence(state.day);
     }
     const label = $("starLabel");
     label.textContent = !canVoteDay() ? "Voting is closed for this day" : (v ? LABELS[v] : "Tap a cookie");
@@ -104,7 +108,7 @@
 
   // ---------- day navigation ----------
   function setDay(d) {
-    state.day = d; state.editing = false;
+    state.day = d; state.editing = false; state.confirmingAway = false;
     loadMyVoteIntoForm();
     $("voteStatus").textContent = ""; $("voteStatus").className = "status";
     render();
@@ -154,6 +158,58 @@
     render(); updateSubmit();
   });
 
+  // ---------- "I wasn't in the office" ----------
+  $("awayBtn").addEventListener("click", () => { state.confirmingAway = true; renderAway(); $("awayYes").focus(); });
+  $("awayNo").addEventListener("click", () => { state.confirmingAway = false; renderAway(); });
+  $("awayYes").addEventListener("click", async () => {
+    if (!state.sb || myVote(state.day) || myAbsence(state.day)) return;
+    $("awayYes").disabled = true;
+    const row = { day: state.day, voter_id: voterId, voter_name: $("voterName").value.trim().slice(0, 40) };
+    const { error } = await state.sb.from("absences").insert(row);
+    $("awayYes").disabled = false;
+    if (error && error.code !== "23505") { // 23505: already saved
+      $("awayMsg").textContent = "That didn't save. Check your connection and try again."; return;
+    }
+    mergeRow(state.absences, row, ["day", "voter_id"]);
+    state.confirmingAway = false; render();
+  });
+
+  function renderAway() {
+    const away = myAbsence(state.day);
+    const voted = myVote(state.day);
+    $("voteForm").hidden = !!away;
+    $("awayNote").hidden = !away;
+    const offer = state.sb && state.extras && state.loaded && canVoteDay() && !voted && !away;
+    $("awayBox").hidden = !offer;
+    $("awayBtn").hidden = state.confirmingAway;
+    $("awayConfirm").hidden = !state.confirmingAway;
+    $("awayMsg").textContent = "";
+  }
+
+  // ---------- up/down votes on ratings ----------
+  const reactionsFor = (day, rated) => state.reactions.filter((x) => x.day === day && x.rated_voter_id === rated);
+  function tallyReactions(day, rated) {
+    let up = 0, down = 0, mine = 0;
+    reactionsFor(day, rated).forEach((x) => {
+      if (x.value === 1) up++; else if (x.value === -1) down++;
+      if (x.voter_id === voterId) mine = x.value;
+    });
+    return { up, down, mine, net: up - down };
+  }
+  async function react(day, rated, value) {
+    if (!state.sb || rated === voterId) return;
+    const cur = tallyReactions(day, rated).mine;
+    const row = { day, rated_voter_id: rated, voter_id: voterId, value: cur === value ? 0 : value };
+    const prev = state.reactions.slice();
+    mergeRow(state.reactions, row, ["day", "rated_voter_id", "voter_id"]); renderTally(); // show it right away
+    const { error } = await state.sb.from("rating_votes").upsert(row);
+    if (error) { state.reactions = prev; renderTally(); banner("Your vote didn't save. Check your connection and try again."); }
+  }
+  function mergeRow(list, row, keys) {
+    const i = list.findIndex((x) => keys.every((k) => x[k] === row[k]));
+    if (i >= 0) list[i] = Object.assign({}, list[i], row); else list.push(row);
+  }
+
   function mergeVote(row) {
     const i = state.votes.findIndex((v) => v.day === row.day && v.voter_id === row.voter_id);
     if (i >= 0) state.votes[i] = row; else state.votes.push(row);
@@ -192,7 +248,7 @@
     $("editLunch").hidden = state.editing || !state.sb;
     $("editLunch").textContent = lunch ? "Change name" : "Name this lunch";
 
-    renderTally(); renderBoard(); renderShare();
+    renderAway(); renderTally(); renderBoard(); renderShare();
   }
 
   function renderTally() {
@@ -202,19 +258,24 @@
     if (resultsHidden(state.day)) {
       const n = rs.length;
       body.innerHTML = '<div class="locked">' + cookie(false) + '<div><p class="locked-title">Rate it to see the results</p><p class="empty-note">' +
-        (n ? n + (n === 1 ? " coworker has" : " coworkers have") + " rated this lunch. Results appear once you've added yours."
+        (n ? n + (n === 1 ? " coworker has" : " coworkers have") + " rated this lunch. Results appear once you've added yours" + (state.extras ? ", or said you were out of the office." : ".")
            : "Nobody has rated this lunch yet. Be the first to tap a cookie above.") + "</p></div></div>";
       return;
     }
-    if (!rs.length) { body.innerHTML = '<p class="empty-note">No ratings for this day yet. Be the first to tap a cookie above.</p>'; return; }
+    if (!rs.length) { body.innerHTML = '<p class="empty-note">No ratings for this day yet.' + (canVoteDay() && !myAbsence(state.day) ? " Be the first to tap a cookie above." : "") + "</p>"; return; }
     const counts = [0, 0, 0, 0, 0, 0]; rs.forEach((r) => counts[r.stars]++);
     const max = Math.max(...counts);
     let html = '<div class="tally"><div class="badge">' + cookie(true, { dots: false }) + '<div><span class="num">' + avg(rs).toFixed(1) + '</span><span class="of">OUT OF 5</span></div></div><div class="dist">';
     for (let i = 5; i >= 1; i--) html += '<div class="row"><span class="lbl">' + i + cookie(true, { dots: false }) + '</span><span class="bar"><i style="width:' + (max ? (counts[i] / max) * 100 : 0) + '%"></i></span><span>' + counts[i] + "</span></div>";
-    html += '</div><span class="sub">' + rs.length + " rating" + (rs.length > 1 ? "s" : "") + " so far</span></div>";
+    const out = state.absences.filter((a) => a.day === state.day).length;
+    html += '</div><span class="sub">' + rs.length + " rating" + (rs.length > 1 ? "s" : "") + " so far" + (out ? " · " + out + " out of office" : "") + "</span></div>";
     html += '<ul class="voters" id="voterList"></ul>';
     body.innerHTML = html;
     const list = $("voterList");
+    if (state.extras) {
+      rs.forEach((r) => { r._score = tallyReactions(r.day, r.voter_id); });
+      rs.sort((a, b) => b._score.net - a._score.net || String(b.updated_at).localeCompare(String(a.updated_at)));
+    }
     rs.forEach((r) => {
       const li = document.createElement("li");
       const mid = document.createElement("div");
@@ -222,11 +283,32 @@
       who.textContent = r.voter_id === voterId ? "You" : (r.voter_name || "A coworker");
       mid.appendChild(who);
       if (r.comment) { const n = document.createElement("div"); n.className = "note"; n.textContent = r.comment; mid.appendChild(n); }
+      if (state.extras) mid.appendChild(reactionRow(r));
       const sc = document.createElement("div"); sc.className = "score";
       for (let k = 1; k <= 5; k++) sc.appendChild(cookieEl(k <= r.stars, { dots: false }));
       sc.setAttribute("role", "img"); sc.setAttribute("aria-label", r.stars + " out of 5 cookies");
       li.append(avatar(r.voter_name, r.voter_id), mid, sc); list.appendChild(li);
     });
+  }
+
+  function reactionRow(r) {
+    const t = r._score || tallyReactions(r.day, r.voter_id);
+    const own = r.voter_id === voterId;
+    const row = document.createElement("div"); row.className = "react";
+    const who = r.voter_id === voterId ? "your rating" : (r.voter_name || "this coworker") + "'s rating";
+    [[1, "up", t.up, "Agree with "], [-1, "down", t.down, "Disagree with "]].forEach(([val, cls, n, verb]) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "react-btn " + cls + (t.mine === val ? " mine" : "");
+      b.disabled = own || !state.sb;
+      b.setAttribute("aria-pressed", String(t.mine === val));
+      b.setAttribute("aria-label", verb + who + " (" + n + ")");
+      b.title = own ? "You can't vote on your own rating" : (t.mine === val ? "Take back your vote" : verb + "this");
+      b.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="' + (val === 1 ? "M8 3l5 6H3z" : "M8 13L3 7h10z") + '"/></svg>';
+      const c = document.createElement("span"); c.textContent = n; b.appendChild(c);
+      b.addEventListener("click", () => react(r.day, r.voter_id, val));
+      row.appendChild(b);
+    });
+    return row;
   }
 
   function renderBoard() {
@@ -308,6 +390,14 @@
     banner("");
     state.days = {}; d.data.forEach((r) => { state.days[r.day] = r.lunch; });
     state.votes = v.data;
+    // These tables come from supabase/002_out_of_office_and_rating_votes.sql; the page still works without them.
+    const [a, x] = await Promise.all([
+      state.sb.from("absences").select("day, voter_id, voter_name").limit(10000),
+      state.sb.from("rating_votes").select("day, rated_voter_id, voter_id, value").limit(50000),
+    ]);
+    state.extras = !a.error && !x.error;
+    state.absences = a.error ? [] : a.data;
+    state.reactions = x.error ? [] : x.data;
     const first = !state.loaded;
     state.loaded = true;
     if (first || !state.dirty) loadMyVoteIntoForm();
@@ -321,6 +411,12 @@
   state.sb.channel("lunch")
     .on("postgres_changes", { event: "*", schema: "public", table: "votes" }, (p) => {
       if (p.new && p.new.day) { mergeVote(p.new); if (!state.dirty) loadMyVoteIntoForm(); render(); }
+    })
+    .on("postgres_changes", { event: "*", schema: "public", table: "absences" }, (p) => {
+      if (p.new && p.new.day) { mergeRow(state.absences, p.new, ["day", "voter_id"]); render(); }
+    })
+    .on("postgres_changes", { event: "*", schema: "public", table: "rating_votes" }, (p) => {
+      if (p.new && p.new.day) { mergeRow(state.reactions, p.new, ["day", "rated_voter_id", "voter_id"]); renderTally(); }
     })
     .on("postgres_changes", { event: "*", schema: "public", table: "days" }, (p) => {
       if (p.new && p.new.day) { state.days[p.new.day] = p.new.lunch; render(); }
