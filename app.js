@@ -188,13 +188,22 @@
 
   // ---------- up/down votes on ratings ----------
   const reactionsFor = (day, rated) => state.reactions.filter((x) => x.day === day && x.rated_voter_id === rated);
+  // People who react have rated or marked themselves out that day, so their name comes from there.
+  function nameOf(id, day) {
+    if (id === voterId) return "You";
+    const same = state.votes.find((v) => v.voter_id === id && v.day === day) || state.absences.find((a) => a.voter_id === id && a.day === day);
+    if (same && same.voter_name) return same.voter_name;
+    const any = state.votes.find((v) => v.voter_id === id && v.voter_name) || state.absences.find((a) => a.voter_id === id && a.voter_name);
+    return any ? any.voter_name : "Someone without a name";
+  }
   function tallyReactions(day, rated) {
-    let up = 0, down = 0, mine = 0;
+    let up = 0, down = 0, mine = 0; const upBy = [], downBy = [];
     reactionsFor(day, rated).forEach((x) => {
-      if (x.value === 1) up++; else if (x.value === -1) down++;
+      if (x.value === 1) { up++; upBy.push(nameOf(x.voter_id, day)); }
+      else if (x.value === -1) { down++; downBy.push(nameOf(x.voter_id, day)); }
       if (x.voter_id === voterId) mine = x.value;
     });
-    return { up, down, mine, net: up - down };
+    return { up, down, mine, net: up - down, upBy, downBy };
   }
   async function react(day, rated, value) {
     if (!state.sb || rated === voterId) return;
@@ -296,16 +305,19 @@
     const own = r.voter_id === voterId;
     const row = document.createElement("div"); row.className = "react";
     const who = r.voter_id === voterId ? "your rating" : (r.voter_name || "this coworker") + "'s rating";
-    [[1, "up", t.up, "Agree with "], [-1, "down", t.down, "Disagree with "]].forEach(([val, cls, n, verb]) => {
+    [[1, "up", t.up, "Agree with ", t.upBy, "Upvoted by "], [-1, "down", t.down, "Disagree with ", t.downBy, "Downvoted by "]].forEach(([val, cls, n, verb, by, byLabel]) => {
       const b = document.createElement("button");
       b.type = "button"; b.className = "react-btn " + cls + (t.mine === val ? " mine" : "");
-      b.disabled = own || !state.sb;
+      const off = own || !state.sb;
+      b.classList.toggle("off", off);
+      if (off) b.setAttribute("aria-disabled", "true"); // not `disabled`, so hovering still shows who voted
       b.setAttribute("aria-pressed", String(t.mine === val));
-      b.setAttribute("aria-label", verb + who + " (" + n + ")");
-      b.title = own ? "You can't vote on your own rating" : (t.mine === val ? "Take back your vote" : verb + "this");
+      const list = by.length ? byLabel + by.join(", ") : (val === 1 ? "No upvotes yet" : "No downvotes yet");
+      b.dataset.tip = list + (own ? " · You can't vote on your own rating" : "");
+      b.setAttribute("aria-label", verb + who + ". " + list);
       b.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="' + (val === 1 ? "M8 3l5 6H3z" : "M8 13L3 7h10z") + '"/></svg>';
       const c = document.createElement("span"); c.textContent = n; b.appendChild(c);
-      b.addEventListener("click", () => react(r.day, r.voter_id, val));
+      b.addEventListener("click", () => { if (!off) react(r.day, r.voter_id, val); });
       row.appendChild(b);
     });
     return row;

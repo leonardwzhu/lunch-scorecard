@@ -179,7 +179,17 @@ textarea { resize: vertical; min-height: 48px; }
 .react-btn:hover:not(:disabled) { border-color: var(--caramel); color: var(--ink); }
 .react-btn.up.mine { background: var(--caramel-soft); border-color: var(--caramel); color: var(--caramel-deep); }
 .react-btn.down.mine { background: color-mix(in srgb, var(--bad) 12%, transparent); border-color: var(--bad); color: var(--bad); }
-.react-btn:disabled { cursor: default; opacity: 0.55; }
+.react-btn.off { cursor: default; opacity: 0.55; }
+.react-btn.off:hover { border-color: var(--line); color: var(--muted); }
+.react-btn { position: relative; }
+.react-btn::after { /* who voted, on hover or keyboard focus */
+  content: attr(data-tip); position: absolute; left: 0; bottom: calc(100% + 8px); z-index: 5;
+  width: max-content; max-width: min(240px, 70vw); white-space: normal; text-align: left;
+  background: var(--ink); color: var(--card); font: 500 0.78rem/1.4 var(--body); letter-spacing: 0;
+  padding: 7px 10px; border-radius: 8px; box-shadow: var(--shadow);
+  opacity: 0; transform: translateY(4px); pointer-events: none; transition: opacity .12s, transform .12s;
+}
+.react-btn:hover::after, .react-btn:focus-visible::after { opacity: 1; transform: none; }
 .locked { display: flex; align-items: center; gap: 18px; padding: 18px; border: 1.5px dashed var(--line); border-radius: 14px; background: var(--bg); }
 .locked svg { width: 64px; height: 64px; flex: none; transform: rotate(-8deg); }
 .locked > div { min-width: 0; }
