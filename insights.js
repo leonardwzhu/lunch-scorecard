@@ -1,4 +1,4 @@
-// Streaks, the Friday recap and taste twins, all worked out from the ratings already loaded.
+// Streaks, the weekly recap and taste twins, all worked out from the ratings already loaded.
 // app.js calls LunchInsights.build(...) and renders what it returns.
 (function () {
   "use strict";
