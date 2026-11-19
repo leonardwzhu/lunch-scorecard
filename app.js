@@ -43,10 +43,11 @@
 
   const today = ymd(new Date());
   const earliestVoteDay = shift(today, -MAX_BACK_DAYS);
-  // Work lunches only: weekends are skipped everywhere.
-  const isWeekend = (d) => { const w = parseYmd(d).getDay(); return w === 0 || w === 6; };
-  function stepWorkday(d, dir) { do { d = shift(d, dir); } while (isWeekend(d)); return d; }
-  const lunchToday = isWeekend(today) ? stepWorkday(today, -1) : today; // on a weekend, Friday's lunch
+  // Only days with an office lunch count (set in config.js; 1 = Monday ... 4 = Thursday). Other days are skipped everywhere.
+  const LUNCH_WEEKDAYS = ((window.LUNCH_CONFIG || {}).lunchWeekdays || [1, 2, 3, 4]).filter((n) => n >= 0 && n <= 6);
+  const isNoLunchDay = (d) => !LUNCH_WEEKDAYS.includes(parseYmd(d).getDay()); // "weekend" = any day without lunch
+  function stepWorkday(d, dir) { for (let i = 0; i < 7; i++) { d = shift(d, dir); if (!isNoLunchDay(d)) return d; } return d; }
+  const lunchToday = isNoLunchDay(today) ? stepWorkday(today, -1) : today; // on a no-lunch day, the last lunch
   function mondayOf(d) { const w = parseYmd(d).getDay(); return shift(d, w === 0 ? -6 : 1 - w); }
   const state = {
     day: lunchToday, sb: null, recapMonday: mondayOf(lunchToday), ins: null,
@@ -375,7 +376,7 @@
   // ---------- streaks, recap, taste twins (see insights.js) ----------
   function computeInsights() {
     if (!state.loaded || !window.LunchInsights) { state.ins = null; return; }
-    const workdays = (d) => !isWeekend(d);
+    const workdays = (d) => !isNoLunchDay(d);
     const days = {}; Object.keys(state.days).filter(workdays).forEach((d) => { days[d] = state.days[d]; });
     state.ins = LunchInsights.build({
       votes: state.votes.filter((v) => workdays(v.day)),
@@ -395,7 +396,7 @@
       : "🔥 Rate " + (lunchToday === today ? "today's" : pretty(lunchToday, { weekday: "long" }) + "'s") + " lunch (or mark yourself out) to keep your " + n + "-lunch streak going.";
   }
 
-  const weekDates = (monday) => [0, 1, 2, 3, 4].map((i) => shift(monday, i));
+  const weekDates = (monday) => [0, 1, 2, 3, 4, 5, 6].map((i) => shift(monday, i)).filter((d) => !isNoLunchDay(d));
   const lunchNameOf = (d) => state.days[d] || "Unnamed lunch";
   const short = (d) => pretty(d, { weekday: "short", month: "short", day: "numeric" });
   $("prevWeek").addEventListener("click", () => { state.recapPicked = true; state.recapMonday = shift(state.recapMonday, -7); renderRecap(); });
