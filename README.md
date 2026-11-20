@@ -50,7 +50,7 @@ Open the page and use **Copy message** at the bottom to get a ready-to-post mess
 
 - **The rent button:** "Help pay Leonard's rent" in the top right just asks "wait, would u acc?". The first click each day per person is logged (run [`supabase/003_rent_clicks.sql`](supabase/003_rent_clicks.sql) once). Only the Supabase project owner can see who clicked, in **Table Editor → rent_clicks**, or as a per-person summary with `select * from rent_clicks_by_person;` in the SQL Editor.
 
-- **Other devices:** "Use this on another laptop or phone" gives each person a private link. Opening it once on another device makes that device the same person, so their ratings, streak and results show there too. Anything that device rated before still counts as theirs.
+- **Other devices:** "Use this on another laptop or phone" gives each person a private link. Opening it once on another device makes that device the same person, so their ratings, streak and results show there too. Anything that device rated before still counts as theirs. To look up anyone's link (to send it to them), run [`supabase/personal_links.sql`](supabase/personal_links.sql) in the Supabase SQL Editor.
 
 ## Good to know
 
