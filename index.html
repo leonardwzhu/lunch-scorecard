@@ -239,6 +239,10 @@ textarea { resize: vertical; min-height: 48px; }
   .podium, .awards { grid-template-columns: 1fr; }
 }
 .linkbtn.subtle { color: var(--muted); font-weight: 500; }
+.auth { display: flex; flex-direction: column; gap: 10px; padding: 18px; border-radius: 14px; background: var(--caramel-soft); }
+.auth-title { margin: 0; font: 800 1.2rem var(--display); font-variation-settings: "SOFT" 100; color: var(--caramel-deep); }
+.auth .empty-note { color: var(--ink); }
+.auth input { background: var(--card); }
 .devices { display: flex; flex-direction: column; gap: 10px; }
 .device-panel { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border-radius: 12px; background: var(--bg); border: 1.5px dashed var(--line); }
 .device-panel p { margin: 0; font-size: 0.9rem; }
@@ -386,7 +390,7 @@ header .text, .hero-side { animation: rise .7s var(--ease-out) both; }
 .reveal .cal-day { animation: rise .35s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 18ms); }
 
 /* small things */
-.away-confirm:not([hidden]), .away-note:not([hidden]), .device-panel:not([hidden]), .link-note:not([hidden]), .auth-step:not([hidden]) { animation: drop .3s var(--ease-out); }
+.sync:not([hidden]), .away-confirm:not([hidden]), .away-note:not([hidden]), .device-panel:not([hidden]), .link-note:not([hidden]), .auth-step:not([hidden]) { animation: drop .3s var(--ease-out); }
 .streak-line:not([hidden]) { animation: rise .45s var(--ease-pop); }
 .react-btn:active:not(.off) { transform: scale(.9); }
 .react-btn.mine svg { transition: transform .2s var(--ease-pop); transform: scale(1.25); }
@@ -455,6 +459,17 @@ header .text, .hero-side { animation: rise .7s var(--ease-out) both; }
           <button class="btn primary" type="submit">Save</button>
           <button class="btn ghost" type="button" id="cancelLunch">Cancel</button>
         </form>
+      </div>
+
+      <div class="auth sync" id="syncBox" hidden>
+        <p class="auth-title">Voted before on another device?</p>
+        <p class="empty-note">Type the name you used, and your ratings, streak and results come right over.</p>
+        <form class="editrow" id="syncForm">
+          <input type="text" id="syncName" maxlength="40" placeholder="The name you used, e.g. Kevin" autocomplete="name" aria-label="The name you rated under">
+          <button class="btn primary" type="submit">Sync</button>
+          <button class="btn ghost" type="button" id="syncSkip">I'm new here</button>
+        </form>
+        <span class="status" id="syncStatus" role="status"></span>
       </div>
 
       <form class="voteform" id="voteForm">

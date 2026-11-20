@@ -50,6 +50,7 @@ Open the page and use **Copy message** at the bottom to get a ready-to-post mess
 
 - **The rent button:** "Help pay Leonard's rent" in the top right just asks "wait, would u acc?". The first click each day per person is logged (run [`supabase/003_rent_clicks.sql`](supabase/003_rent_clicks.sql) once). Only the Supabase project owner can see who clicked, in **Table Editor → rent_clicks**, or as a per-person summary with `select * from rent_clicks_by_person;` in the SQL Editor.
 
+- **New device sync:** a browser that has never voted asks "Voted before on another device?". Typing the name you used links the browser to every rating made under that name (capital letters don't matter). If someone skips that and just votes under a name that's been used before, it syncs automatically, keeping their earlier comment unless they type a new one.
 - **Other devices:** "Use this on another laptop or phone" gives each person a private link. Opening it once on another device makes that device the same person, so their ratings, streak and results show there too. Anything that device rated before still counts as theirs. To look up anyone's link (to send it to them), run [`supabase/personal_links.sql`](supabase/personal_links.sql) in the Supabase SQL Editor.
 
 ## Good to know

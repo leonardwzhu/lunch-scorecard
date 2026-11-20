@@ -46,16 +46,26 @@
   const isMe = (id) => !!id && (id === voterId || aliasIds.includes(id));
 
   // Opening a personal link (#device=<id>.<id>...) makes this browser the same person as the other device.
+  // Make this browser the same person as the given ids (first = the one new ratings go under).
+  // Everything this browser did before still counts as yours.
+  function adoptIds(ids) {
+    ids = ids.filter(Boolean);
+    if (!ids.length) return false;
+    aliasIds = [...new Set([voterId, ...aliasIds, ...ids.slice(1)])].filter((x) => x && x !== ids[0]).slice(0, 20);
+    voterId = ids[0];
+    store("lunch.voterId", voterId);
+    store("lunch.aliasIds", JSON.stringify(aliasIds));
+    store("lunch.syncDone", "1");
+    return true;
+  }
+
   (function adoptDeviceLink() {
     const m = /^#device=([A-Za-z0-9-]{8,64}(?:\.[A-Za-z0-9-]{8,64}){0,20})$/.exec(location.hash);
     if (!m) return;
     const ids = m[1].split(".");
     history.replaceState(null, "", location.pathname + location.search);
     if (ids[0] === voterId) { state0.linkNote = "This browser is already linked to you."; return; }
-    aliasIds = [...new Set([voterId, ...aliasIds, ...ids.slice(1)])].filter((x) => x && x !== ids[0]);
-    voterId = ids[0];
-    store("lunch.voterId", voterId);
-    store("lunch.aliasIds", JSON.stringify(aliasIds));
+    adoptIds(ids);
     state0.linkNote = "This browser is now linked to you. Your ratings, streak and results from your other device show here too.";
   })();
 
@@ -286,10 +296,18 @@
   $("voteForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     if (saving || !state.pick || !state.sb || !canVoteDay()) return;
+    const synced = autoSyncByName($("voterName").value);
+    const existing = myVote(state.day); // after a sync, this can be a rating made on another device
+    if (synced && existing) {
+      // Keep what they already wrote unless they typed something new, and keep their name's spelling.
+      if (!$("comment").value.trim() && existing.comment) $("comment").value = existing.comment;
+      if (existing.voter_name && existing.voter_name.toLowerCase() === $("voterName").value.trim().toLowerCase()) $("voterName").value = existing.voter_name;
+    }
+    if (synced) store("lunch.name", $("voterName").value.trim());
     saving = true; $("submitVote").disabled = true;
     const status = $("voteStatus"); status.className = "status"; status.textContent = "Saving…";
     const row = {
-      day: state.day, voter_id: (myVote(state.day) || {}).voter_id || voterId,
+      day: state.day, voter_id: (existing || {}).voter_id || voterId,
       voter_name: $("voterName").value.trim().slice(0, 40),
       stars: state.pick, comment: $("comment").value.trim().slice(0, 200),
       updated_at: new Date().toISOString(),
@@ -311,7 +329,9 @@
   $("awayBtn").addEventListener("click", () => { state.confirmingAway = true; renderAway(); $("awayYes").focus(); });
   $("awayNo").addEventListener("click", () => { state.confirmingAway = false; renderAway(); });
   $("awayYes").addEventListener("click", async () => {
-    if (!state.sb || myVote(state.day) || myAbsence(state.day)) return;
+    if (!state.sb) return;
+    autoSyncByName($("voterName").value);
+    if (myVote(state.day) || myAbsence(state.day)) { state.confirmingAway = false; render(); return; }
     $("awayYes").disabled = true;
     const row = { day: state.day, voter_id: voterId, voter_name: $("voterName").value.trim().slice(0, 40) };
     const { error } = await state.sb.from("absences").insert(row);
@@ -407,7 +427,7 @@
     $("editLunch").textContent = lunch ? "Change name" : "Name this lunch";
 
     computeInsights();
-    renderCal(); renderAway(); renderStreak(); renderTally(); renderBoard(); renderRecap(); renderTaste(); renderShare();
+    renderCal(); renderSync(); renderAway(); renderStreak(); renderTally(); renderBoard(); renderRecap(); renderTaste(); renderShare();
   }
 
   function renderTally() {
@@ -695,6 +715,61 @@
   document.addEventListener("click", (e) => {
     if (!$("rentBubble").hidden && !e.target.closest(".hero-side")) { $("rentBubble").hidden = true; $("rentJoke").setAttribute("aria-expanded", "false"); }
   });
+
+  // ---------- "voted before?" sync by name ----------
+  const hasHistory = () => state.votes.some((v) => isMe(v.voter_id)) || state.absences.some((a) => isMe(a.voter_id));
+  // Every id that has rated or marked itself out under this name, most recently active first.
+  function idsForName(name) {
+    const n = (name || "").trim().toLowerCase();
+    if (!n) return [];
+    const last = new Map();
+    [...state.votes, ...state.absences].forEach((r) => {
+      if ((r.voter_name || "").trim().toLowerCase() !== n) return;
+      const prev = last.get(r.voter_id);
+      if (!prev || prev < r.day) last.set(r.voter_id, r.day);
+    });
+    return [...last.entries()].sort((a, b) => b[1].localeCompare(a[1])).map((e) => e[0]);
+  }
+  function showLinkNote(text) { const el = $("linkNote"); el.textContent = text; el.hidden = !text; }
+  function syncTo(name, ids) {
+    adoptIds(ids);
+    const n = state.votes.filter((v) => isMe(v.voter_id)).length;
+    showLinkNote("Synced! This browser now has your " + n + " rating" + (n === 1 ? "" : "s") + " as " + name + ", plus your streak and results.");
+  }
+  // A new device voting under a name someone already used is that person: sync first, so nobody gets two ratings for a day.
+  function autoSyncByName(name) {
+    if (hasHistory()) return false;
+    const ids = idsForName(name);
+    if (!ids.length || ids.some(isMe)) return false;
+    const named = [...state.votes, ...state.absences].find((r) => r.voter_id === ids[0] && r.voter_name);
+    syncTo(named ? named.voter_name.trim() : name.trim(), ids);
+    $("syncBox").hidden = true;
+    return true;
+  }
+
+  function renderSync() {
+    const known = state.votes.length || state.absences.length;
+    $("syncBox").hidden = !(state.loaded && state.sb && known && !hasHistory() && store("lunch.syncDone") !== "1");
+  }
+  $("syncForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const name = $("syncName").value.trim(), st = $("syncStatus");
+    if (!name) { st.className = "status err"; st.textContent = "Type the name you used when you rated before."; return; }
+    const ids = idsForName(name);
+    if (!ids.length) {
+      st.className = "status err";
+      st.textContent = "No ratings under \u201C" + name + "\u201D yet. Check the spelling, or tap I'm new here.";
+      return;
+    }
+    st.textContent = "";
+    const named = [...state.votes, ...state.absences].find((r) => ids.includes(r.voter_id) && (r.voter_name || "").trim().toLowerCase() === name.toLowerCase());
+    const spelled = named ? named.voter_name.trim() : name;
+    syncTo(spelled, ids);
+    $("voterName").value = spelled; store("lunch.name", spelled);
+    $("syncBox").hidden = true;
+    loadMyVoteIntoForm(); render();
+  });
+  $("syncSkip").addEventListener("click", () => { store("lunch.syncDone", "1"); $("syncBox").hidden = true; $("voterName").focus(); });
 
   // ---------- personal link for other devices ----------
   function deviceLink() {
