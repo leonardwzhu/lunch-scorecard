@@ -2,22 +2,42 @@
   "use strict";
   const LABELS = ["", "1 · Stale", "2 · Crumbly", "3 · Fine", "4 · Tasty", "5 · Dunk-worthy"];
 
-  // A scalloped cookie, drawn once and reused everywhere a rating shows.
+  // A caramelised biscuit: a wide rounded rectangle with a crimped edge, a raised inner border and a few
+  // sugar specks. Drawn once and reused everywhere a rating shows. (A generic biscuit, no brand marks.)
   const COOKIE_PATH = (() => {
-    const pts = [];
-    for (let i = 0; i < 120; i++) {
-      const a = (i / 120) * Math.PI * 2;
-      const r = 21 + 1.3 * Math.cos(a * 16);
-      pts.push((24 + r * Math.cos(a)).toFixed(2) + " " + (24 + r * Math.sin(a)).toFixed(2));
+    const x0 = 4, y0 = 4, w = 56, h = 38, r = 7, amp = 1.05, bumpLen = 4.2, P = Math.PI;
+    const line = (ax, ay, bx, by, nx, ny) => ({ len: Math.hypot(bx - ax, by - ay), at: (t) => [ax + (bx - ax) * t, ay + (by - ay) * t, nx, ny] });
+    const arc = (cx, cy, a0, a1) => ({ len: Math.abs(a1 - a0) * r, at: (t) => { const a = a0 + (a1 - a0) * t; return [cx + r * Math.cos(a), cy + r * Math.sin(a), Math.cos(a), Math.sin(a)]; } });
+    const parts = [
+      line(x0 + r, y0, x0 + w - r, y0, 0, -1), arc(x0 + w - r, y0 + r, -P / 2, 0),
+      line(x0 + w, y0 + r, x0 + w, y0 + h - r, 1, 0), arc(x0 + w - r, y0 + h - r, 0, P / 2),
+      line(x0 + w - r, y0 + h, x0 + r, y0 + h, 0, 1), arc(x0 + r, y0 + h - r, P / 2, P),
+      line(x0, y0 + h - r, x0, y0 + r, -1, 0), arc(x0 + r, y0 + r, P, 1.5 * P),
+    ];
+    const total = parts.reduce((a, q) => a + q.len, 0);
+    const bumps = Math.round(total / bumpLen), N = bumps * 8, pts = [];
+    for (let i = 0; i < N; i++) {
+      let d = (i / N) * total, k = 0;
+      while (k < parts.length - 1 && d > parts[k].len) { d -= parts[k].len; k++; }
+      const [x, y, nx, ny] = parts[k].at(Math.min(1, d / parts[k].len));
+      const off = amp * Math.cos((2 * P * bumps * i) / N); // the crimp: little waves all the way round
+      pts.push((x + nx * off).toFixed(2) + " " + (y + ny * off).toFixed(2));
     }
     return "M" + pts.join("L") + "Z";
   })();
+  const SPECKS = [[17, 16], [27, 13.5], [40, 15], [48, 21], [21, 29], [34, 31.5], [45, 30], [30, 22.5], [13, 23]];
+  // One shared "baked" gradient: lighter in the middle, toasty at the edges.
+  document.body.insertAdjacentHTML("afterbegin",
+    '<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>' +
+    '<radialGradient id="ckBake" cx="50%" cy="42%" r="68%"><stop offset="0" style="stop-color:var(--cookie-light)"/>' +
+    '<stop offset="0.62" style="stop-color:var(--cookie)"/><stop offset="1" style="stop-color:var(--cookie-edge)"/></radialGradient></defs></svg>');
   function cookie(on, opts) {
     const o = opts || {};
-    const dots = o.dots === false ? "" :
-      '<g class="ck-dots"><circle cx="17" cy="19" r="1.5"/><circle cx="30" cy="17" r="1.5"/><circle cx="24" cy="26" r="1.5"/><circle cx="31" cy="30" r="1.5"/><circle cx="16" cy="30" r="1.5"/></g>';
-    return '<svg viewBox="0 0 48 48" aria-hidden="true"' + (on ? "" : ' class="off"') + (o.cls ? ' data-k="' + o.cls + '"' : "") + '>' +
-      '<path class="ck-body" d="' + COOKIE_PATH + '"/><circle class="ck-ring" cx="24" cy="24" r="16.5"/>' + dots + "</svg>";
+    const detail = o.dots === false ? "" :
+      '<rect class="ck-hi" x="11.3" y="10.3" width="41.4" height="25.4" rx="3.4"/><g class="ck-dots">' +
+      SPECKS.map(([x, y]) => '<circle cx="' + x + '" cy="' + y + '" r="0.85"/>').join("") + "</g>";
+    return '<svg viewBox="0 0 64 46" aria-hidden="true"' + (on ? "" : ' class="off"') + ">" +
+      '<path class="ck-body" d="' + COOKIE_PATH + '"/><rect class="ck-ring" x="10.5" y="9.5" width="43" height="27" rx="4"/>' + detail + "</svg>";
   }
   function cookieEl(on, opts) { const t = document.createElement("template"); t.innerHTML = cookie(on, opts); return t.content.firstChild; }
 
