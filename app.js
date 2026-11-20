@@ -1,6 +1,6 @@
 (function () {
   "use strict";
-  const LABELS = ["", "1 · Stale", "2 · Crumbly", "3 · Fine", "4 · Tasty", "5 · Dunk-worthy"];
+  const LABELS = ["", "1 · Burnt", "2 · Underbaked", "3 · Fine", "4 · Golden", "5 · Perfectly caramelised"];
 
   // A caramelised biscuit: a wide rounded rectangle with a crimped edge, a raised inner border and a few
   // sugar specks. Drawn once and reused everywhere a rating shows. (A generic biscuit, no brand marks.)
@@ -31,17 +31,30 @@
     '<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>' +
     '<radialGradient id="ckBake" cx="50%" cy="42%" r="68%"><stop offset="0" style="stop-color:var(--cookie-light)"/>' +
     '<stop offset="0.62" style="stop-color:var(--cookie)"/><stop offset="1" style="stop-color:var(--cookie-edge)"/></radialGradient></defs></svg>');
+  // A face pressed into the biscuit: 1 frowns, 3 is unsure, 5 grins with happy eyes.
+  function face(n) {
+    const curve = [0, -4.2, -1.8, 0.6, 3.2, 5.4][n] || 0;
+    const eyes = n >= 5
+      ? '<path d="M23.5 19.6 q2.5 -2.8 5 0"/><path d="M35.5 19.6 q2.5 -2.8 5 0"/>'
+      : n <= 1
+        ? '<path d="M23.8 17.6 l4.2 1.4"/><path d="M40.2 17.6 l-4.2 1.4"/><circle cx="26" cy="20.2" r="1.15"/><circle cx="38" cy="20.2" r="1.15"/>'
+        : '<circle cx="26" cy="19.4" r="1.25"/><circle cx="38" cy="19.4" r="1.25"/>';
+    const mouth = '<path d="M' + (n >= 5 ? "23.5" : "25") + " 27.2 Q32 " + (27.2 + curve * 1.6).toFixed(1) + " " + (n >= 5 ? "40.5" : "39") + ' 27.2"/>';
+    const g = eyes + mouth;
+    return '<g class="ck-face-hi" transform="translate(0.6 0.7)">' + g + '</g><g class="ck-face">' + g + "</g>";
+  }
   function cookie(on, opts) {
     const o = opts || {};
+    const specks = o.face ? SPECKS.filter(([x, y]) => Math.abs(x - 32) > 11 || Math.abs(y - 23) > 8) : SPECKS;
     const detail = o.dots === false ? "" :
       '<rect class="ck-hi" x="11.3" y="10.3" width="41.4" height="25.4" rx="3.4"/><g class="ck-dots">' +
-      SPECKS.map(([x, y]) => '<circle cx="' + x + '" cy="' + y + '" r="0.85"/>').join("") + "</g>";
+      specks.map(([x, y]) => '<circle cx="' + x + '" cy="' + y + '" r="0.85"/>').join("") + "</g>" + (o.face ? face(o.face) : "");
     return '<svg viewBox="0 0 64 46" aria-hidden="true"' + (on ? "" : ' class="off"') + ">" +
       '<path class="ck-body" d="' + COOKIE_PATH + '"/><rect class="ck-ring" x="10.5" y="9.5" width="43" height="27" rx="4"/>' + detail + "</svg>";
   }
   function cookieEl(on, opts) { const t = document.createElement("template"); t.innerHTML = cookie(on, opts); return t.content.firstChild; }
 
-  const hero = cookieEl(true); hero.classList.add("hero-cookie"); document.getElementById("heroCookie").appendChild(hero);
+  const hero = cookieEl(true, { face: 5 }); hero.classList.add("hero-cookie"); document.getElementById("heroCookie").appendChild(hero);
   const MAX_BACK_DAYS = 7; // matches the votes_recent_day check in supabase/schema.sql
   const $ = (id) => document.getElementById(id);
 
@@ -114,8 +127,8 @@
   for (let i = 1; i <= 5; i++) {
     const b = document.createElement("button");
     b.type = "button"; b.className = "star"; b.id = "star" + i;
-    b.setAttribute("role", "radio"); b.setAttribute("aria-label", i + " cookie" + (i > 1 ? "s" : ""));
-    b.innerHTML = cookie(false);
+    b.setAttribute("role", "radio"); b.setAttribute("aria-label", i + " biscuit" + (i > 1 ? "s" : ""));
+    b.innerHTML = cookie(false, { face: i });
     b.addEventListener("click", () => {
       state.pick = i; state.dirty = true; paintStars(); updateSubmit(); scheduleSave();
       for (let j = 1; j <= i; j++) { const s = $("star" + j); s.classList.remove("pop"); void s.offsetWidth; s.style.animationDelay = (j - 1) * 40 + "ms"; s.classList.add("pop"); }
@@ -139,7 +152,7 @@
       b.disabled = !state.sb || !canVoteDay() || !!myAbsence(state.day);
     }
     const label = $("starLabel");
-    label.textContent = !canVoteDay() ? "Voting is closed for this day" : (v ? LABELS[v] : "Tap a cookie to rate");
+    label.textContent = !canVoteDay() ? "Voting is closed for this day" : (v ? LABELS[v] : "Tap a biscuit to rate");
     label.classList.toggle("idle", !v || !canVoteDay());
   }
 
@@ -153,13 +166,13 @@
     $("saveRow").hidden = !(state.sb && canVoteDay() && !myAbsence(state.day) && (commentChanged || nameChanged));
     $("submitVote").disabled = !state.pick;
     $("submitVote").textContent = commentChanged ? "Save comment" : "Save name";
-    $("saveHint").textContent = state.pick ? "" : "Tap a cookie and your comment saves with your rating.";
+    $("saveHint").textContent = state.pick ? "" : "Tap a biscuit and your comment saves with your rating.";
   }
   $("comment").addEventListener("input", () => { state.dirty = true; updateSubmit(); });
   $("voterName").addEventListener("input", () => { store("lunch.name", $("voterName").value.trim()); updateSubmit(); });
 
   // Known name shows as "Rating as Kevin · Change" instead of a text box. The box only shrinks on load or
-  // after a save, never while you're mid-way through, so the cookies don't jump out from under your finger.
+  // after a save, never while you're mid-way through, so the biscuits don't jump out from under your finger.
   let editingName = !(store("lunch.name") || "").trim();
   function renderName() {
     const name = $("voterName").value.trim();
@@ -526,12 +539,12 @@
     if (resultsHidden(state.day)) {
       const n = rs.length;
       playOnce(body, state.day + "|locked");
-      body.innerHTML = '<div class="locked">' + cookie(false) + '<div><p class="locked-title">Rate it to see the results</p><p class="empty-note">' +
+      body.innerHTML = '<div class="locked">' + cookie(false, { face: 3 }) + '<div><p class="locked-title">Rate it to see the results</p><p class="empty-note">' +
         (n ? n + (n === 1 ? " coworker has" : " coworkers have") + " rated this lunch. Results appear once you've added yours" + (state.extras ? ", or said you were out of the office." : ".")
-           : "Nobody has rated this lunch yet. Be the first to tap a cookie above.") + "</p></div></div>";
+           : "Nobody has rated this lunch yet. Be the first to tap a biscuit above.") + "</p></div></div>";
       return;
     }
-    if (!rs.length) { body.innerHTML = '<p class="empty-note">No ratings for this day yet.' + (canVoteDay() && !myAbsence(state.day) ? " Be the first to tap a cookie above." : "") + "</p>"; return; }
+    if (!rs.length) { body.innerHTML = '<p class="empty-note">No ratings for this day yet.' + (canVoteDay() && !myAbsence(state.day) ? " Be the first to tap a biscuit above." : "") + "</p>"; return; }
     const counts = [0, 0, 0, 0, 0, 0]; rs.forEach((r) => counts[r.stars]++);
     const max = Math.max(...counts);
     let html = '<div class="tally"><div class="badge">' + cookie(true, { dots: false }) + '<div><span class="num">' + avg(rs).toFixed(1) + '</span><span class="of">OUT OF 5</span></div></div><div class="dist">';
@@ -556,7 +569,7 @@
       if (state.extras) mid.appendChild(reactionRow(r));
       const sc = document.createElement("div"); sc.className = "score";
       for (let k = 1; k <= 5; k++) sc.appendChild(cookieEl(k <= r.stars, { dots: false }));
-      sc.setAttribute("role", "img"); sc.setAttribute("aria-label", r.stars + " out of 5 cookies");
+      sc.setAttribute("role", "img"); sc.setAttribute("aria-label", r.stars + " out of 5 biscuits");
       const st = state.ins ? state.ins.streakFor(r.voter_id, r.voter_name) : 0;
       if (st >= 2) { const c = document.createElement("span"); c.className = "streak-chip"; c.textContent = "🔥 " + st; c.title = st + " lunches in a row"; who.appendChild(c); }
       li.style.setProperty("--i", list.children.length);
@@ -604,7 +617,7 @@
     const rows = Object.values(groups).map((g) => ({ ...g, avg: avg(g.ratings) }))
       .sort((a, b) => b.avg - a.avg || b.ratings.length - a.ratings.length);
     const hiddenNote = hiddenDays ? '<p class="empty-note board-note">' + (hiddenDays === 1 ? "1 recent lunch joins" : hiddenDays + " recent lunches join") + " the leaderboard once you've rated " + (hiddenDays === 1 ? "it" : "them") + ".</p>" : "";
-    if (!rows.length) { body.innerHTML = '<p class="empty-note">Lunches show up here, ranked by average cookies, once people start rating them.</p>' + hiddenNote; return; }
+    if (!rows.length) { body.innerHTML = '<p class="empty-note">Lunches show up here, ranked by average biscuits, once people start rating them.</p>' + hiddenNote; return; }
     const table = document.createElement("table"); table.className = "board";
     table.innerHTML = '<thead><tr><th>#</th><th>Lunch</th><th style="text-align:right">Avg</th></tr></thead>';
     const tb = document.createElement("tbody");
@@ -683,7 +696,7 @@
     }
     if (r.best) {
       const pod = el("div", "podium");
-      const card = (cls, label, x) => { const d = el("div", cls); d.append(el("span", "eyebrow", label), el("span", "big-name", x.name), el("span", "detail", x.avg.toFixed(1) + " cookies · " + short(x.day))); return d; };
+      const card = (cls, label, x) => { const d = el("div", cls); d.append(el("span", "eyebrow", label), el("span", "big-name", x.name), el("span", "detail", x.avg.toFixed(1) + " biscuits · " + short(x.day))); return d; };
       pod.appendChild(card("best", "Lunch of the week", r.best));
       if (r.worst) pod.appendChild(card("worst", "Biggest letdown", r.worst));
       body.appendChild(pod);
@@ -696,9 +709,9 @@
     const awards = [
       r.hot && [r.hot.names.length > 1 ? "Hottest streaks" : "Hottest streak", r.hot.name, "🔥 " + r.hot.n + " lunches in a row"],
       r.agreed && ["Most agreed-with", r.agreed.name, "+" + r.agreed.score + " from coworkers"],
-      r.harshest && ["Harshest critic", r.harshest.name, "Averaged " + r.harshest.avg.toFixed(1) + " cookies"],
-      r.easiest && ["Easiest to please", r.easiest.name, "Averaged " + r.easiest.avg.toFixed(1) + " cookies"],
-      r.contrarian && ["Contrarian", r.contrarian.name, r.contrarian.off.toFixed(1) + " cookies off the group, on average"],
+      r.harshest && ["Harshest critic", r.harshest.name, "Averaged " + r.harshest.avg.toFixed(1) + " biscuits"],
+      r.easiest && ["Easiest to please", r.easiest.name, "Averaged " + r.easiest.avg.toFixed(1) + " biscuits"],
+      r.contrarian && ["Contrarian", r.contrarian.name, r.contrarian.off.toFixed(1) + " biscuits off the group, on average"],
     ].filter(Boolean);
     if (awards.length) {
       const ul = el("ul", "awards");
@@ -775,7 +788,7 @@
     const cfg = window.LUNCH_CONFIG || {};
     const lunch = state.days[lunchToday];
     $("shareText").textContent = "🍽️ Lunch poll for " + pretty(lunchToday) + (cfg.teamName ? " (" + cfg.teamName + ")" : "") +
-      (lunch ? ": " + lunch : "") + "\nHow was it? Rate it 1–5 cookies here: " + location.href.split("#")[0].split("?")[0];
+      (lunch ? ": " + lunch : "") + "\nHow was it? Rate it 1–5 biscuits here: " + location.href.split("#")[0].split("?")[0];
   }
   $("copyShare").addEventListener("click", () => {
     const text = $("shareText").textContent, st = $("copyStatus");
