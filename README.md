@@ -50,8 +50,10 @@ Open the page and use **Copy message** at the bottom to get a ready-to-post mess
 
 - **The rent button:** "Help pay Leonard's rent" in the top right just asks "wait, would u acc?". The first click each day per person is logged (run [`supabase/003_rent_clicks.sql`](supabase/003_rent_clicks.sql) once). Only the Supabase project owner can see who clicked, in **Table Editor → rent_clicks**, or as a per-person summary with `select * from rent_clicks_by_person;` in the SQL Editor.
 
+- **Other devices:** "Use this on another laptop or phone" gives each person a private link. Opening it once on another device makes that device the same person, so their ratings, streak and results show there too. Anything that device rated before still counts as theirs.
+
 ## Good to know
 
-- **Votes are tied to a browser, not a login.** Someone on two devices counts as two voters, and clearing site data starts them over as a new voter. That's fine for a lunch poll, but it isn't secure voting.
+- **Votes are tied to a browser, not a login.** Each device counts as a separate person until it's linked with the personal link above, and clearing site data starts a browser over. Anyone with someone's personal link can rate as them. That's fine for a lunch poll, but it isn't secure voting.
 - **Fixing data:** open **Table Editor** in Supabase to edit or delete a lunch name or rating.
 - **Free plan pausing:** Supabase pauses free projects after a week with no activity. Daily use keeps it awake. If it does pause, resume it from the Supabase dashboard.

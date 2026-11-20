@@ -9,7 +9,7 @@
     return n ? "n:" + n : "id:" + id;
   }
 
-  function build({ votes, absences, reactions, days, myId, today, isHidden }) {
+  function build({ votes, absences, reactions, days, myId, isMe, today, isHidden }) {
     const people = new Map();
     const person = (id, name) => {
       const k = personKey(id, name);
@@ -22,7 +22,8 @@
     votes.forEach((v) => { const p = person(v.voter_id, v.voter_name); p.acted.add(v.day); p.ratings.set(v.day, v); });
     absences.forEach((a) => { const p = person(a.voter_id, a.voter_name); p.acted.add(a.day); p.out.add(a.day); });
 
-    const me = [...people.values()].find((p) => p.ids.has(myId)) || null;
+    const isMine = isMe || ((id) => id === myId);
+    const me = [...people.values()].find((p) => [...p.ids].some(isMine)) || null;
     const display = (p) => (p === me ? "You" : p.name || "Someone without a name");
 
     // Lunch days: any day with a named lunch, a rating or an out-of-office entry. Weekends drop out on their own.

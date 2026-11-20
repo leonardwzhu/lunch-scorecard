@@ -239,6 +239,12 @@ textarea { resize: vertical; min-height: 48px; }
   .podium, .awards { grid-template-columns: 1fr; }
 }
 .linkbtn.subtle { color: var(--muted); font-weight: 500; }
+.devices { display: flex; flex-direction: column; gap: 10px; }
+.device-panel { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border-radius: 12px; background: var(--bg); border: 1.5px dashed var(--line); }
+.device-panel p { margin: 0; font-size: 0.9rem; }
+.device-panel pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 500 0.78rem/1.45 var(--mono); background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; user-select: all; }
+.device-warn { color: var(--muted); font-size: 0.8rem !important; }
+.link-note { margin: 0; padding: 12px 14px; border-radius: 12px; background: var(--caramel-soft); color: var(--ink); font-weight: 600; }
 .away { border-top: 1.5px dashed var(--line); padding-top: 16px; }
 .away-confirm { display: flex; flex-direction: column; gap: 12px; }
 .away-confirm p { margin: 0; color: var(--ink); }
@@ -416,8 +422,21 @@ footer { text-align: center; color: var(--muted); font-size: 0.8rem; }
           </div>
         </div>
       </div>
+      <p class="link-note" id="linkNote" role="status" hidden></p>
       <p class="streak-line" id="streakLine" hidden></p>
       <p class="kbd-hint">Tip: press <kbd>←</kbd> <kbd>→</kbd> to move between lunches.</p>
+      <div class="devices">
+        <button class="linkbtn subtle" id="deviceBtn" type="button" aria-expanded="false" aria-controls="devicePanel">Use this on another laptop or phone</button>
+        <div class="device-panel" id="devicePanel" hidden>
+          <p>Open this link once on your other device. It'll show your ratings, streak and results there too, and anything that device already rated still counts as yours.</p>
+          <pre id="deviceLink"></pre>
+          <div class="voterow">
+            <button class="btn ghost" id="copyDevice" type="button">Copy my link</button>
+            <span class="status" id="deviceStatus" role="status"></span>
+          </div>
+          <p class="device-warn">Keep it to yourself: anyone with this link can rate as you.</p>
+        </div>
+      </div>
       <div class="away-note" id="awayNote" hidden>
         <strong>You were out of the office for this lunch.</strong>
         You can see the results below, but you can't rate it.

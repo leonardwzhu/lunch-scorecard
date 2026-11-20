@@ -30,6 +30,7 @@
   function shift(s, n) { const d = parseYmd(s); d.setDate(d.getDate() + n); return ymd(d); }
   function pretty(s, opts) { return parseYmd(s).toLocaleDateString(undefined, opts || { weekday: "long", month: "short", day: "numeric" }); }
 
+  const state0 = { linkNote: "" };
   // ---------- this browser's voter identity (no login) ----------
   function store(key, val) {
     try { if (val === undefined) return localStorage.getItem(key); localStorage.setItem(key, val); } catch (e) { return null; }
@@ -39,6 +40,25 @@
     voterId = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now().toString(36));
     store("lunch.voterId", voterId);
   }
+  // Ids this browser has used before linking to another device. They still count as "you".
+  let aliasIds = [];
+  try { aliasIds = JSON.parse(store("lunch.aliasIds") || "[]").filter((x) => typeof x === "string"); } catch (e) { aliasIds = []; }
+  const isMe = (id) => !!id && (id === voterId || aliasIds.includes(id));
+
+  // Opening a personal link (#device=<id>.<id>...) makes this browser the same person as the other device.
+  (function adoptDeviceLink() {
+    const m = /^#device=([A-Za-z0-9-]{8,64}(?:\.[A-Za-z0-9-]{8,64}){0,20})$/.exec(location.hash);
+    if (!m) return;
+    const ids = m[1].split(".");
+    history.replaceState(null, "", location.pathname + location.search);
+    if (ids[0] === voterId) { state0.linkNote = "This browser is already linked to you."; return; }
+    aliasIds = [...new Set([voterId, ...aliasIds, ...ids.slice(1)])].filter((x) => x && x !== ids[0]);
+    voterId = ids[0];
+    store("lunch.voterId", voterId);
+    store("lunch.aliasIds", JSON.stringify(aliasIds));
+    state0.linkNote = "This browser is now linked to you. Your ratings, streak and results from your other device show here too.";
+  })();
+
   $("voterName").value = store("lunch.name") || "";
 
   const today = ymd(new Date());
@@ -78,7 +98,7 @@
   function canVoteDay() { return votingOpen(state.day); }
   // Results stay hidden until you've rated that day (once voting closes, anyone can see them).
   function resultsHidden(d) { return votingOpen(d) && !myVote(d) && !myAbsence(d); }
-  const myAbsence = (day) => state.absences.find((a) => a.day === day && a.voter_id === voterId);
+  const myAbsence = (day) => state.absences.find((a) => a.day === day && isMe(a.voter_id));
   function paintStars(hover) {
     const v = hover || state.pick;
     for (let i = 1; i <= 5; i++) {
@@ -93,7 +113,7 @@
     label.classList.toggle("idle", !v || !canVoteDay());
   }
 
-  const myVote = (day) => state.votes.find((v) => v.day === day && v.voter_id === voterId);
+  const myVote = (day) => state.votes.find((v) => v.day === day && isMe(v.voter_id));
   function updateSubmit() {
     const mv = myVote(state.day);
     const name = $("voterName").value.trim();
@@ -223,7 +243,7 @@
     saving = true; $("submitVote").disabled = true;
     const status = $("voteStatus"); status.className = "status"; status.textContent = "Saving…";
     const row = {
-      day: state.day, voter_id: voterId,
+      day: state.day, voter_id: (myVote(state.day) || {}).voter_id || voterId,
       voter_name: $("voterName").value.trim().slice(0, 40),
       stars: state.pick, comment: $("comment").value.trim().slice(0, 200),
       updated_at: new Date().toISOString(),
@@ -272,25 +292,25 @@
   const reactionsFor = (day, rated) => state.reactions.filter((x) => x.day === day && x.rated_voter_id === rated);
   // People who react have rated or marked themselves out that day, so their name comes from there.
   function nameOf(id, day) {
-    if (id === voterId) return "You";
+    if (isMe(id)) return "You";
     const same = state.votes.find((v) => v.voter_id === id && v.day === day) || state.absences.find((a) => a.voter_id === id && a.day === day);
     if (same && same.voter_name) return same.voter_name;
     const any = state.votes.find((v) => v.voter_id === id && v.voter_name) || state.absences.find((a) => a.voter_id === id && a.voter_name);
     return any ? any.voter_name : "Someone without a name";
   }
   function tallyReactions(day, rated) {
-    let up = 0, down = 0, mine = 0; const upBy = [], downBy = [];
+    let up = 0, down = 0, mine = 0, t_mineId = null; const upBy = [], downBy = [];
     reactionsFor(day, rated).forEach((x) => {
       if (x.value === 1) { up++; upBy.push(nameOf(x.voter_id, day)); }
       else if (x.value === -1) { down++; downBy.push(nameOf(x.voter_id, day)); }
-      if (x.voter_id === voterId) mine = x.value;
+      if (isMe(x.voter_id)) { mine = x.value; t_mineId = x.voter_id; }
     });
-    return { up, down, mine, net: up - down, upBy, downBy };
+    return { up, down, mine, mineId: t_mineId, net: up - down, upBy, downBy };
   }
   async function react(day, rated, value) {
-    if (!state.sb || rated === voterId) return;
+    if (!state.sb || isMe(rated)) return;
     const cur = tallyReactions(day, rated).mine;
-    const row = { day, rated_voter_id: rated, voter_id: voterId, value: cur === value ? 0 : value };
+    const row = { day, rated_voter_id: rated, voter_id: tallyReactions(day, rated).mineId || voterId, value: cur === value ? 0 : value };
     const prev = state.reactions.slice();
     mergeRow(state.reactions, row, ["day", "rated_voter_id", "voter_id"]); renderTally(); // show it right away
     const { error } = await state.sb.from("rating_votes").upsert(row);
@@ -372,7 +392,7 @@
       const li = document.createElement("li");
       const mid = document.createElement("div");
       const who = document.createElement("div"); who.className = "who";
-      who.textContent = r.voter_id === voterId ? "You" : (r.voter_name || "A coworker");
+      who.textContent = isMe(r.voter_id) ? "You" : (r.voter_name || "A coworker");
       mid.appendChild(who);
       if (r.comment) { const n = document.createElement("div"); n.className = "note"; n.textContent = r.comment; mid.appendChild(n); }
       if (state.extras) mid.appendChild(reactionRow(r));
@@ -387,9 +407,9 @@
 
   function reactionRow(r) {
     const t = r._score || tallyReactions(r.day, r.voter_id);
-    const own = r.voter_id === voterId;
+    const own = isMe(r.voter_id);
     const row = document.createElement("div"); row.className = "react";
-    const who = r.voter_id === voterId ? "your rating" : (r.voter_name || "this coworker") + "'s rating";
+    const who = isMe(r.voter_id) ? "your rating" : (r.voter_name || "this coworker") + "'s rating";
     [[1, "up", t.up, "Agree with ", t.upBy, "Upvoted by "], [-1, "down", t.down, "Disagree with ", t.downBy, "Downvoted by "]].forEach(([val, cls, n, verb, by, byLabel]) => {
       const b = document.createElement("button");
       b.type = "button"; b.className = "react-btn " + cls + (t.mine === val ? " mine" : "");
@@ -457,7 +477,7 @@
     state.ins = LunchInsights.build({
       votes: state.votes.filter((v) => workdays(v.day)),
       absences: state.absences.filter((a) => workdays(a.day)),
-      reactions: state.reactions, days, myId: voterId, today, isHidden: resultsHidden,
+      reactions: state.reactions, days, myId: voterId, isMe, today, isHidden: resultsHidden,
     });
   }
 
@@ -613,7 +633,7 @@
     if (!state.sb) return;
     if (store("lunch.rentClickDay") === today) return; // one click per person per day (the database checks too)
     const typed = $("voterName").value.trim();
-    const known = state.votes.find((v) => v.voter_id === voterId && v.voter_name) || state.absences.find((a) => a.voter_id === voterId && a.voter_name);
+    const known = state.votes.find((v) => isMe(v.voter_id) && v.voter_name) || state.absences.find((a) => isMe(a.voter_id) && a.voter_name);
     const name = (typed || (known && known.voter_name) || "").slice(0, 40);
     state.sb.from("rent_clicks").insert({ voter_id: voterId, voter_name: name, click_day: today })
       .then(({ error }) => { if (!error || error.code === "23505") store("lunch.rentClickDay", today); }, () => {});
@@ -621,6 +641,23 @@
   document.addEventListener("click", (e) => {
     if (!$("rentBubble").hidden && !e.target.closest(".hero-side")) { $("rentBubble").hidden = true; $("rentJoke").setAttribute("aria-expanded", "false"); }
   });
+
+  // ---------- personal link for other devices ----------
+  function deviceLink() {
+    return location.href.split("#")[0].split("?")[0] + "#device=" + [voterId, ...aliasIds].slice(0, 21).join(".");
+  }
+  $("deviceBtn").addEventListener("click", () => {
+    const panel = $("devicePanel"), open = panel.hidden;
+    panel.hidden = !open; $("deviceBtn").setAttribute("aria-expanded", String(open));
+    if (open) { $("deviceLink").textContent = deviceLink(); $("deviceStatus").textContent = ""; }
+  });
+  $("copyDevice").addEventListener("click", () => {
+    const text = deviceLink(), st = $("deviceStatus");
+    const fallback = () => { const r = document.createRange(); r.selectNodeContents($("deviceLink")); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); st.className = "status"; st.textContent = "Link selected. Press Ctrl+C to copy."; };
+    if (!navigator.clipboard) return fallback();
+    navigator.clipboard.writeText(text).then(() => { st.className = "status ok"; st.textContent = "Copied. Open it on your other device."; }, fallback);
+  });
+  if (state0.linkNote) { $("linkNote").textContent = state0.linkNote; $("linkNote").hidden = false; }
 
   // ---------- boot ----------
   paintStars(); render();
@@ -658,6 +695,10 @@
     const first = !state.loaded;
     state.loaded = true;
     if (first || !state.dirty) loadMyVoteIntoForm();
+    if (!$("voterName").value.trim()) { // e.g. a newly linked device: use the name on your latest rating
+      const mine = state.votes.filter((v) => isMe(v.voter_id) && v.voter_name).sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)))[0];
+      if (mine) { $("voterName").value = mine.voter_name; store("lunch.name", mine.voter_name); updateSubmit(); }
+    }
     render();
   }
 
