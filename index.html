@@ -338,6 +338,69 @@ footer { text-align: center; color: var(--muted); font-size: 0.8rem; }
 .rent-bubble::before { content: ""; position: absolute; top: -6px; right: 22px; width: 12px; height: 12px; background: var(--ink); transform: rotate(45deg); border-radius: 2px; }
 @keyframes bubble { from { transform: scale(.6) translateY(-6px); opacity: 0; } }
 @media (max-width: 460px) { .rent-joke { font-size: 0.72rem; padding: 5px 10px; } }
+/* ---------- motion ---------- */
+:root { --ease-out: cubic-bezier(.2, .8, .2, 1); --ease-pop: cubic-bezier(.2, .9, .3, 1.35); }
+@keyframes rise { from { opacity: 0; transform: translateY(14px); } }
+@keyframes fade { from { opacity: 0; } }
+@keyframes grow { from { transform: scaleX(0); } }
+@keyframes spin-in { from { opacity: 0; transform: rotate(-200deg) scale(.4); } }
+@keyframes slide-next { from { opacity: 0; transform: translateX(28px); } }
+@keyframes slide-prev { from { opacity: 0; transform: translateX(-28px); } }
+@keyframes drop { from { opacity: 0; transform: translateY(-8px); } }
+@keyframes crumb { to { transform: translate(var(--dx), var(--dy)) rotate(260deg) scale(var(--s)); opacity: 0; } }
+@keyframes glow { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--caramel) 25%, transparent); } }
+
+/* page load: header and cards rise in, one after another */
+header .text, .hero-side { animation: rise .7s var(--ease-out) both; }
+.hero-side { animation-delay: .1s; }
+.cols > .card, .col > .card { animation: rise .7s var(--ease-out) both; }
+.o1 { animation-delay: .08s !important; } .o2 { animation-delay: .16s !important; } .o3 { animation-delay: .24s !important; }
+.o4 { animation-delay: .3s !important; } .o5 { animation-delay: .36s !important; } .o6, .o7 { animation-delay: .42s !important; }
+
+/* switching days: the ballot slides in from the side you moved */
+.ballot .inner.slide-next { animation: slide-next .4s var(--ease-out); }
+.ballot .inner.slide-prev { animation: slide-prev .4s var(--ease-out); }
+
+/* results unlocking */
+.reveal .badge svg { animation: spin-in .9s var(--ease-pop) both; }
+.reveal .dist .bar i { animation: grow .8s var(--ease-out) both; transform-origin: left center; }
+.reveal .dist .row:nth-child(2) .bar i { animation-delay: .06s; }
+.reveal .dist .row:nth-child(3) .bar i { animation-delay: .12s; }
+.reveal .dist .row:nth-child(4) .bar i { animation-delay: .18s; }
+.reveal .dist .row:nth-child(5) .bar i { animation-delay: .24s; }
+.reveal .tally .sub, .reveal .locked { animation: fade .5s ease both; }
+.reveal .voters li { animation: rise .5s var(--ease-out) both; animation-delay: calc(.25s + var(--i, 0) * 60ms); }
+
+/* leaderboard, recap, taste twins, calendar */
+.reveal tbody tr { animation: rise .5s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 70ms); }
+#recapBody.reveal > * { animation: rise .55s var(--ease-out) both; }
+#recapBody.reveal > :nth-child(2) { animation-delay: .07s; } #recapBody.reveal > :nth-child(3) { animation-delay: .14s; }
+#recapBody.reveal > :nth-child(4) { animation-delay: .21s; } #recapBody.reveal > :nth-child(5) { animation-delay: .28s; }
+#recapBody.reveal .awards li { animation: rise .5s var(--ease-out) both; }
+#recapBody.reveal .awards li:nth-child(n) { animation-delay: calc(.2s + 50ms * var(--n, 0)); }
+#tasteBody.reveal .alike .bar i { animation: grow .9s var(--ease-out) both; transform-origin: left center; }
+#tasteBody.reveal .twin { animation: rise .55s var(--ease-out) both; }
+#tasteBody.reveal .twin .pair svg { animation: spin-in .8s var(--ease-pop) both; }
+#tasteBody.reveal .twin .pair svg + svg { animation-delay: .12s; }
+.cal:not([hidden]) { animation: drop .25s var(--ease-out); }
+.reveal .cal-day { animation: rise .35s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 18ms); }
+
+/* small things */
+.away-confirm:not([hidden]), .away-note:not([hidden]), .device-panel:not([hidden]), .link-note:not([hidden]), .auth-step:not([hidden]) { animation: drop .3s var(--ease-out); }
+.streak-line:not([hidden]) { animation: rise .45s var(--ease-pop); }
+.react-btn:active:not(.off) { transform: scale(.9); }
+.react-btn.mine svg { transition: transform .2s var(--ease-pop); transform: scale(1.25); }
+.btn:active:not(:disabled) { transform: scale(.97); }
+.btn.primary { transition: transform .12s, background .15s, box-shadow .2s; }
+.btn.primary:hover:not(:disabled) { box-shadow: 0 6px 16px -8px var(--caramel-deep); }
+.status.ok:not(:empty) { animation: rise .35s var(--ease-pop); }
+.board tbody tr { transition: background .15s; }
+.board tbody tr:hover { background: color-mix(in srgb, var(--caramel-soft) 55%, transparent); }
+.hero-cookie { transition: transform .5s var(--ease-pop); }
+.hero-side:hover .hero-cookie { transform: rotate(14deg) scale(1.04); }
+.crumb { position: fixed; z-index: 60; width: 9px; height: 9px; margin: -4px 0 0 -4px; border-radius: 45% 55% 50% 40%; background: var(--cookie); pointer-events: none; animation: crumb .9s cubic-bezier(.2, .7, .4, 1) forwards; }
+.crumb:nth-child(3n) { background: var(--caramel-deep); width: 6px; height: 6px; }
+.dist .bar i, .alike .bar i { transition: width .5s var(--ease-out); }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
 </head>

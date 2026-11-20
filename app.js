@@ -162,7 +162,7 @@
   function renderCal() {
     const cal = $("cal"), btn = $("dateLabel");
     cal.hidden = !state.calOpen; btn.setAttribute("aria-expanded", String(!!state.calOpen));
-    if (!state.calOpen) return;
+    if (!state.calOpen) { delete $("calGrid").dataset.animKey; return; }
     const m = state.calMonth || monthStart(state.day);
     $("calMonth").textContent = parseYmd(m).toLocaleDateString(undefined, { month: "long", year: "numeric" });
     $("calPrev").disabled = m <= earliestMonth();
@@ -170,6 +170,7 @@
 
     const cols = LUNCH_WEEKDAYS.slice().sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)); // Monday first
     const grid = $("calGrid");
+    playOnce(grid, m);
     grid.style.gridTemplateColumns = "repeat(" + cols.length + ", minmax(0, 1fr))";
     grid.replaceChildren();
     cols.forEach((w) => {
@@ -204,12 +205,57 @@
         b.setAttribute("aria-label", pretty(d) + ", " + (lunch || "no lunch named") + ", " + status);
         b.title = (lunch || "No lunch named") + " · " + status.charAt(0).toUpperCase() + status.slice(1);
         b.addEventListener("click", () => { state.calOpen = false; setDay(d); renderCal(); $("dateLabel").focus(); });
+        b.style.setProperty("--i", grid.querySelectorAll(".cal-day").length);
         grid.appendChild(b);
       });
     }
   }
 
+  // ---------- motion ----------
+  // Animations play only when something meaningful changes (a new day, results unlocking), never on
+  // every live refresh. Everything is skipped for people who've asked their system to reduce motion.
+  const calm = () => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } };
+  function playOnce(el, key, cls) {
+    cls = cls || "reveal";
+    if (!el || el.dataset.animKey === key) return false;
+    el.dataset.animKey = key;
+    if (calm()) return false;
+    el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls);
+    clearTimeout(el._animT); el._animT = setTimeout(() => el.classList.remove(cls), 1600);
+    return true;
+  }
+  function countUp(el, to, digits) {
+    if (!el || calm()) return;
+    const start = performance.now(), dur = 900;
+    const step = (now) => {
+      const k = Math.min(1, (now - start) / dur), eased = 1 - Math.pow(1 - k, 3);
+      el.textContent = (to * eased).toFixed(digits);
+      if (k < 1) requestAnimationFrame(step);
+    };
+    el.textContent = (0).toFixed(digits); requestAnimationFrame(step);
+  }
+  function crumbBurst(from) {
+    if (!from || calm()) return;
+    const r = from.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    for (let i = 0; i < 14; i++) {
+      const c = document.createElement("span"); c.className = "crumb";
+      const ang = Math.random() * Math.PI * 2, dist = 40 + Math.random() * 70;
+      c.style.left = cx + "px"; c.style.top = cy + "px";
+      c.style.setProperty("--dx", Math.cos(ang) * dist + "px");
+      c.style.setProperty("--dy", Math.sin(ang) * dist - 30 + "px");
+      c.style.setProperty("--s", (0.5 + Math.random() * 0.8).toFixed(2));
+      c.style.animationDelay = Math.random() * 60 + "ms";
+      document.body.appendChild(c); setTimeout(() => c.remove(), 1100);
+    }
+  }
+
   function setDay(d) {
+    if (d !== state.day && !calm()) { // slide the ballot in from the direction you moved
+      const inner = document.querySelector(".ballot .inner");
+      inner.classList.remove("slide-next", "slide-prev"); void inner.offsetWidth;
+      inner.classList.add(d > state.day ? "slide-next" : "slide-prev");
+      clearTimeout(inner._t); inner._t = setTimeout(() => inner.classList.remove("slide-next", "slide-prev"), 500);
+    }
     state.day = d; state.editing = false; state.confirmingAway = false;
     loadMyVoteIntoForm();
     $("voteStatus").textContent = ""; $("voteStatus").className = "status";
@@ -257,6 +303,7 @@
     }
     mergeVote(row); state.dirty = false;
     status.className = "status ok"; status.textContent = "Saved. Thanks for rating.";
+    crumbBurst($("submitVote"));
     render(); updateSubmit();
   });
 
@@ -369,6 +416,7 @@
     const rs = ratingsFor(state.day);
     if (resultsHidden(state.day)) {
       const n = rs.length;
+      playOnce(body, state.day + "|locked");
       body.innerHTML = '<div class="locked">' + cookie(false) + '<div><p class="locked-title">Rate it to see the results</p><p class="empty-note">' +
         (n ? n + (n === 1 ? " coworker has" : " coworkers have") + " rated this lunch. Results appear once you've added yours" + (state.extras ? ", or said you were out of the office." : ".")
            : "Nobody has rated this lunch yet. Be the first to tap a cookie above.") + "</p></div></div>";
@@ -383,6 +431,7 @@
     html += '</div><span class="sub">' + rs.length + " rating" + (rs.length > 1 ? "s" : "") + " so far" + (out ? " · " + out + " out of office" : "") + "</span></div>";
     html += '<ul class="voters" id="voterList"></ul>';
     body.innerHTML = html;
+    if (playOnce(body, state.day + "|open")) countUp(body.querySelector(".badge .num"), avg(rs), 1);
     const list = $("voterList");
     if (state.extras) {
       rs.forEach((r) => { r._score = tallyReactions(r.day, r.voter_id); });
@@ -401,6 +450,7 @@
       sc.setAttribute("role", "img"); sc.setAttribute("aria-label", r.stars + " out of 5 cookies");
       const st = state.ins ? state.ins.streakFor(r.voter_id, r.voter_name) : 0;
       if (st >= 2) { const c = document.createElement("span"); c.className = "streak-chip"; c.textContent = "🔥 " + st; c.title = st + " lunches in a row"; who.appendChild(c); }
+      li.style.setProperty("--i", list.children.length);
       li.append(avatar(r.voter_name, r.voter_id), mid, sc); list.appendChild(li);
     });
   }
@@ -462,10 +512,12 @@
       const tdA = document.createElement("td"); tdA.className = "avg";
       const av = document.createElement("span"); av.textContent = r.avg.toFixed(1); av.appendChild(cookieEl(true, { dots: false }));
       av.setAttribute("aria-label", r.avg.toFixed(1) + " out of 5"); tdA.appendChild(av);
+      tr.style.setProperty("--i", i);
       tr.append(tdR, tdD, tdA); tb.appendChild(tr);
     });
     table.appendChild(tb);
     body.replaceChildren(table);
+    playOnce(body, rows.map((r) => r.name).join("|") + "|" + hiddenDays);
     if (hiddenNote) body.insertAdjacentHTML("beforeend", hiddenNote);
   }
 
@@ -508,6 +560,7 @@
     $("recapStatus").textContent = ""; $("recapText").hidden = true;
     if (!state.loaded || !ins) return;
     const r = ins.recap(monday, weekDates(monday), lunchNameOf, false);
+    playOnce(body, monday + "|" + r.lunches + "|" + r.ratings);
     // Early in the week there's nothing to recap yet, so start on last week instead.
     if (!state.recapPicked && thisWeek && !r.lunches && !r.hiddenCount) { state.recapPicked = true; state.recapMonday = shift(monday, -7); return renderRecap(); }
     state.recapPicked = true;
@@ -540,7 +593,7 @@
     ].filter(Boolean);
     if (awards.length) {
       const ul = el("ul", "awards");
-      awards.forEach(([label, who, detail]) => { const li = el("li"); li.append(el("span", "eyebrow", label), el("span", "who", who), el("span", "detail", detail)); ul.appendChild(li); });
+      awards.forEach(([label, who, detail], n) => { const li = el("li"); li.style.setProperty("--n", n); li.append(el("span", "eyebrow", label), el("span", "who", who), el("span", "detail", detail)); ul.appendChild(li); });
       body.appendChild(ul);
     }
     let foot = r.lunches + " lunch" + (r.lunches > 1 ? "es" : "") + " · " + r.ratings + " rating" + (r.ratings === 1 ? "" : "s") + (r.outCount ? " · " + r.outCount + " out of office" : "");
@@ -581,6 +634,7 @@
     if (!state.loaded || !ins) return;
     const t = ins.taste;
     body.replaceChildren();
+    playOnce(body, (t.twin ? t.twin.name : "") + "|" + t.mine.length);
     if (t.twin) {
       const box = el("div", "twin");
       const pair = el("span", "pair"); pair.append(cookieEl(true), cookieEl(true));
