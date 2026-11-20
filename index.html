@@ -239,6 +239,29 @@ textarea { resize: vertical; min-height: 48px; }
   .podium, .awards { grid-template-columns: 1fr; }
 }
 .linkbtn.subtle { color: var(--muted); font-weight: 500; }
+.namechip { margin: 0; color: var(--muted); font-size: 0.92rem; }
+.namechip strong { color: var(--ink); }
+.ratingline { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; min-height: 1.5em; }
+.ratingline .status { font-size: 0.85rem; }
+#saveRow .empty-note { font-size: 0.85rem; }
+.results-pill { position: fixed; z-index: 20; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+  background: var(--ink); color: var(--card); border: none; border-radius: 999px; padding: 12px 20px; font: 700 0.95rem var(--body);
+  box-shadow: 0 10px 28px -10px rgba(40, 20, 8, 0.6); cursor: pointer; white-space: nowrap; animation: pill-in .4s var(--ease-pop, ease) both; }
+@keyframes pill-in { from { opacity: 0; transform: translate(-50%, 16px); } }
+@media (min-width: 960px) { .results-pill { display: none !important; } }
+@media (max-width: 360px) { header .tag { visibility: hidden; } }
+@media (max-width: 460px) {
+  .wrap { padding-block: 20px 72px; gap: 18px; }
+  h1 { font-size: 2.15rem; }
+  header { gap: 10px; }
+  header p { font-size: 0.95rem; }
+  header { display: block; position: relative; }
+  header .text { gap: 8px; }
+  header .hero-side { position: absolute; top: 0; right: 0; }
+  #heroCookie { display: none; }
+  h1 { font-size: clamp(1.8rem, 9vw, 2.3rem); white-space: nowrap; }
+  .ballot .inner { padding: 18px; gap: 18px; }
+}
 .auth { display: flex; flex-direction: column; gap: 10px; padding: 18px; border-radius: 14px; background: var(--caramel-soft); }
 .auth-title { margin: 0; font: 800 1.2rem var(--display); font-variation-settings: "SOFT" 100; color: var(--caramel-deep); }
 .auth .empty-note { color: var(--ink); }
@@ -341,7 +364,7 @@ footer { text-align: center; color: var(--muted); font-size: 0.8rem; }
   .cols { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); }
 }
 /* ---------- the rent joke (top right) ---------- */
-.hero-side { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; position: relative; align-self: start; }
+.hero-side { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; position: relative; align-self: start; z-index: 15; }
 .rent-joke { background: var(--card); color: var(--caramel-deep); border: 1.5px solid var(--caramel); border-radius: 999px; padding: 6px 12px; font: 600 0.8rem var(--body); cursor: pointer; white-space: nowrap; transition: transform .15s, background .15s; }
 .rent-joke:hover { background: var(--caramel-soft); transform: rotate(-2deg); }
 .rent-bubble { position: absolute; top: 44px; right: 0; z-index: 6; background: var(--ink); color: var(--card); font: 800 1.05rem var(--display); font-variation-settings: "SOFT" 100; padding: 10px 14px; border-radius: 14px; white-space: nowrap; box-shadow: var(--shadow); animation: bubble .25s cubic-bezier(.2,.9,.3,1.4); }
@@ -424,7 +447,7 @@ header .text, .hero-side { animation: rise .7s var(--ease-out) both; }
     <div class="text">
       <span class="tag">Daily lunch poll</span>
       <h1>Lunch Scorecard</h1>
-      <p>How was lunch? Give it 1 to 5 cookies to see what everyone else thought. You can change your rating any time today.</p>
+      <p>Rate today's lunch from 1 to 5 cookies, then see what everyone else thought.</p>
     </div>
     <div class="hero-side">
       <button class="rent-joke" id="rentJoke" type="button" aria-expanded="false" aria-controls="rentBubble">Help pay Leonard's rent</button>
@@ -465,7 +488,8 @@ header .text, .hero-side { animation: rise .7s var(--ease-out) both; }
         <div class="name empty" id="lunchName">Nobody has named this lunch yet</div>
         <button class="linkbtn" id="editLunch" hidden>Name this lunch</button>
         <form class="editrow" id="lunchForm" hidden>
-          <input type="text" id="lunchInput" maxlength="80" placeholder="e.g. Chicken shawarma bowls" aria-label="Lunch name">
+          <input type="text" id="lunchInput" maxlength="80" placeholder="e.g. Chicken shawarma bowls" aria-label="Lunch name" list="lunchNames" autocomplete="off">
+          <datalist id="lunchNames"></datalist>
           <button class="btn primary" type="submit">Save</button>
           <button class="btn ghost" type="button" id="cancelLunch">Cancel</button>
         </form>
@@ -499,19 +523,23 @@ header .text, .hero-side { animation: rise .7s var(--ease-out) both; }
       </div>
 
       <form class="voteform" id="voteForm">
-        <div class="field">
+        <div class="field" id="nameField">
           <label class="eyebrow" for="voterName">Your name</label>
           <input type="text" id="voterName" maxlength="40" placeholder="So people know who rated it" autocomplete="name">
         </div>
+        <p class="namechip" id="nameChip" hidden>Rating as <strong id="nameChipText"></strong> · <button class="linkbtn subtle" id="nameChange" type="button">Change</button></p>
         <div class="field">
           <span class="eyebrow">Your rating</span>
           <div class="stars" id="stars" role="radiogroup" aria-label="Your rating"></div>
-          <div class="starlabel idle" id="starLabel">Tap a cookie</div>
+          <div class="ratingline">
+            <span class="starlabel idle" id="starLabel">Tap a cookie to rate</span>
+            <span class="status" id="voteStatus" role="status"></span>
+          </div>
         </div>
         <textarea id="comment" maxlength="200" rows="2" placeholder="Optional: what made it good or bad?" aria-label="Comment"></textarea>
-        <div class="voterow">
-          <button class="btn primary" type="submit" id="submitVote" disabled>Submit rating</button>
-          <span class="status" id="voteStatus" role="status"></span>
+        <div class="voterow" id="saveRow" hidden>
+          <button class="btn primary" type="submit" id="submitVote">Save comment</button>
+          <span class="empty-note" id="saveHint"></span>
         </div>
       </form>
 
@@ -594,6 +622,8 @@ header .text, .hero-side { animation: rise .7s var(--ease-out) both; }
     </div>
   </section>
   </main>
+
+  <button class="results-pill" id="resultsPill" type="button" hidden>See what everyone thought ↓</button>
 
   <footer>Ratings refresh live while this page is open.</footer>
 </div>

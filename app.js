@@ -97,7 +97,7 @@
     b.setAttribute("role", "radio"); b.setAttribute("aria-label", i + " cookie" + (i > 1 ? "s" : ""));
     b.innerHTML = cookie(false);
     b.addEventListener("click", () => {
-      state.pick = i; state.dirty = true; paintStars(); updateSubmit();
+      state.pick = i; state.dirty = true; paintStars(); updateSubmit(); scheduleSave();
       for (let j = 1; j <= i; j++) { const s = $("star" + j); s.classList.remove("pop"); void s.offsetWidth; s.style.animationDelay = (j - 1) * 40 + "ms"; s.classList.add("pop"); }
     });
     b.addEventListener("mouseenter", () => paintStars(i));
@@ -119,20 +119,36 @@
       b.disabled = !state.sb || !canVoteDay() || !!myAbsence(state.day);
     }
     const label = $("starLabel");
-    label.textContent = !canVoteDay() ? "Voting is closed for this day" : (v ? LABELS[v] : "Tap a cookie");
+    label.textContent = !canVoteDay() ? "Voting is closed for this day" : (v ? LABELS[v] : "Tap a cookie to rate");
     label.classList.toggle("idle", !v || !canVoteDay());
   }
 
   const myVote = (day) => state.votes.find((v) => v.day === day && isMe(v.voter_id));
+  // Tapping a cookie saves on its own; this button only appears for an unsaved comment or name change.
   function updateSubmit() {
     const mv = myVote(state.day);
-    const name = $("voterName").value.trim();
-    const changed = state.pick && (!mv || mv.stars !== state.pick || (mv.comment || "") !== $("comment").value.trim() || (mv.voter_name || "") !== name);
-    $("submitVote").disabled = !state.sb || !canVoteDay() || !changed;
-    $("submitVote").textContent = mv ? "Update rating" : "Submit rating";
+    const comment = $("comment").value.trim(), name = $("voterName").value.trim();
+    const commentChanged = comment !== ((mv && mv.comment) || "");
+    const nameChanged = !!mv && name !== (mv.voter_name || "");
+    $("saveRow").hidden = !(state.sb && canVoteDay() && !myAbsence(state.day) && (commentChanged || nameChanged));
+    $("submitVote").disabled = !state.pick;
+    $("submitVote").textContent = commentChanged ? "Save comment" : "Save name";
+    $("saveHint").textContent = state.pick ? "" : "Tap a cookie and your comment saves with your rating.";
   }
   $("comment").addEventListener("input", () => { state.dirty = true; updateSubmit(); });
   $("voterName").addEventListener("input", () => { store("lunch.name", $("voterName").value.trim()); updateSubmit(); });
+
+  // Known name shows as "Rating as Kevin · Change" instead of a text box. The box only shrinks on load or
+  // after a save, never while you're mid-way through, so the cookies don't jump out from under your finger.
+  let editingName = !(store("lunch.name") || "").trim();
+  function renderName() {
+    const name = $("voterName").value.trim();
+    const chip = !!name && !editingName;
+    $("nameField").hidden = chip; $("nameChip").hidden = !chip;
+    if (chip) $("nameChipText").textContent = name;
+  }
+  $("nameChange").addEventListener("click", () => { editingName = true; renderName(); $("voterName").focus(); $("voterName").select(); });
+  $("voterName").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("voterName").blur(); } });
 
   function loadMyVoteIntoForm() {
     const mv = myVote(state.day);
@@ -260,6 +276,7 @@
   }
 
   function setDay(d) {
+    if (saveTimer) { clearTimeout(saveTimer); saveVote(); } // finish a just-tapped rating for the day you're leaving
     if (d !== state.day && !calm()) { // slide the ballot in from the direction you moved
       const inner = document.querySelector(".ballot .inner");
       inner.classList.remove("slide-next", "slide-prev"); void inner.offsetWidth;
@@ -282,9 +299,27 @@
     render(); $("lunchInput").focus();
   });
   $("cancelLunch").addEventListener("click", () => { state.editing = false; render(); });
+
+  // Suggest lunch names used before, most recent first, so repeat lunches keep one spelling.
+  let lunchNamesKey = "";
+  function pastLunchNames() {
+    const seen = new Map();
+    Object.keys(state.days).sort().reverse().forEach((d) => {
+      const n = (state.days[d] || "").trim(); if (n && !seen.has(n.toLowerCase())) seen.set(n.toLowerCase(), n);
+    });
+    return [...seen.values()];
+  }
+  function renderLunchNames() {
+    const names = pastLunchNames(), key = names.join("|");
+    if (key === lunchNamesKey) return;
+    lunchNamesKey = key;
+    $("lunchNames").replaceChildren(...names.map((n) => { const o = document.createElement("option"); o.value = n; return o; }));
+  }
   $("lunchForm").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const name = $("lunchInput").value.trim().slice(0, 80);
+    let name = $("lunchInput").value.trim().slice(0, 80);
+    const same = pastLunchNames().find((n) => n.toLowerCase() === name.toLowerCase());
+    if (same) name = same; // "pokeworks" becomes the existing "Pokeworks"
     if (!name || !state.sb) return;
     const { error } = await state.sb.from("days").upsert({ day: state.day, lunch: name, updated_at: new Date().toISOString() });
     if (error) { banner("The lunch name didn't save: " + error.message); return; }
@@ -293,9 +328,20 @@
 
   // ---------- voting ----------
   let saving = false;
-  $("voteForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    if (saving || !state.pick || !state.sb || !canVoteDay()) return;
+  let saveTimer = null, savePending = false;
+  function scheduleSave() {
+    clearTimeout(saveTimer);
+    if (!state.sb || !canVoteDay() || myAbsence(state.day)) return;
+    $("voteStatus").className = "status"; $("voteStatus").textContent = "";
+    saveTimer = setTimeout(saveVote, 450); // a quick change of mind becomes one save
+  }
+  $("voteForm").addEventListener("submit", (e) => { e.preventDefault(); clearTimeout(saveTimer); saveVote(); });
+
+  async function saveVote() {
+    saveTimer = null;
+    if (saving) { savePending = true; return; }
+    if (!state.pick || !state.sb || !canVoteDay()) return;
+    const firstToday = !myVote(state.day);
     const synced = autoSyncByName($("voterName").value);
     const existing = myVote(state.day); // after a sync, this can be a rating made on another device
     if (synced && existing) {
@@ -306,6 +352,7 @@
     if (synced) store("lunch.name", $("voterName").value.trim());
     saving = true; $("submitVote").disabled = true;
     const status = $("voteStatus"); status.className = "status"; status.textContent = "Saving…";
+    const savedDay = state.day;
     const row = {
       day: state.day, voter_id: (existing || {}).voter_id || voterId,
       voter_name: $("voterName").value.trim().slice(0, 40),
@@ -316,13 +363,34 @@
     saving = false;
     if (error) {
       status.className = "status err";
-      status.textContent = "Your rating didn't save. Check your connection and try again.";
+      status.textContent = "Didn't save. Check your connection and tap again.";
       updateSubmit(); return;
     }
     mergeVote(row); state.dirty = false;
-    status.className = "status ok"; status.textContent = "Saved. Thanks for rating.";
-    crumbBurst($("submitVote"));
+    if (row.voter_name) editingName = false;
+    if (state.day === savedDay) { status.className = "status ok"; status.textContent = "Saved ✓"; }
+    crumbBurst($("star" + row.stars));
     render(); updateSubmit();
+    if (firstToday) offerResults();
+    if (savePending) { savePending = false; saveVote(); }
+  }
+
+  // On phones the results are further down the page, so point to them after your first rating.
+  let resultsSeen = null;
+  function offerResults() {
+    const card = $("tallyTitle").closest("section");
+    if (matchMedia("(min-width: 960px)").matches) return;
+    const r = card.getBoundingClientRect();
+    if (r.top < innerHeight * 0.7) return; // already on screen
+    $("resultsPill").hidden = false;
+    if (!resultsSeen && "IntersectionObserver" in window) {
+      resultsSeen = new IntersectionObserver((entries) => { if (entries.some((e) => e.isIntersecting)) $("resultsPill").hidden = true; }, { threshold: 0.25 });
+      resultsSeen.observe(card);
+    }
+  }
+  $("resultsPill").addEventListener("click", () => {
+    $("resultsPill").hidden = true;
+    $("tallyTitle").closest("section").scrollIntoView({ behavior: calm() ? "auto" : "smooth", block: "start" });
   });
 
   // ---------- "I wasn't in the office" ----------
@@ -427,6 +495,7 @@
     $("editLunch").textContent = lunch ? "Change name" : "Name this lunch";
 
     computeInsights();
+    renderName(); renderLunchNames();
     renderCal(); renderSync(); renderAway(); renderStreak(); renderTally(); renderBoard(); renderRecap(); renderTaste(); renderShare();
   }
 
