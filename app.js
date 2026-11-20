@@ -769,7 +769,21 @@
     $("syncBox").hidden = true;
     loadMyVoteIntoForm(); render();
   });
-  $("syncSkip").addEventListener("click", () => { store("lunch.syncDone", "1"); $("syncBox").hidden = true; $("voterName").focus(); });
+  // "I'm new here" swaps the sync prompt for a short welcome that explains the app.
+  function showWelcome(show) {
+    $("welcomeBox").hidden = !show;
+    if (show) { $("syncBox").hidden = true; $("welcomeBox").scrollIntoView({ block: "nearest", behavior: calm() ? "auto" : "smooth" }); $("welcomeOk").focus({ preventScroll: true }); }
+  }
+  $("syncSkip").addEventListener("click", () => { store("lunch.syncDone", "1"); showWelcome(true); });
+  $("welcomeOk").addEventListener("click", () => { showWelcome(false); $("voterName").focus(); });
+  $("howBtn").addEventListener("click", () => showWelcome($("welcomeBox").hidden));
+  // Name the actual lunch days, e.g. "Monday to Thursday".
+  (function () {
+    const order = LUNCH_WEEKDAYS.slice().sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7));
+    const name = (w) => new Date(2024, 0, 1 + ((w + 6) % 7)).toLocaleDateString(undefined, { weekday: "long" }); // Jan 1 2024 was a Monday
+    const run = order.every((w, i) => i === 0 || ((w + 6) % 7) === ((order[i - 1] + 6) % 7) + 1);
+    $("howDays").textContent = order.length > 2 && run ? name(order[0]) + " to " + name(order[order.length - 1]) : order.map(name).join(", ");
+  })();
 
   // ---------- personal link for other devices ----------
   function deviceLink() {

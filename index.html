@@ -243,6 +243,12 @@ textarea { resize: vertical; min-height: 48px; }
 .auth-title { margin: 0; font: 800 1.2rem var(--display); font-variation-settings: "SOFT" 100; color: var(--caramel-deep); }
 .auth .empty-note { color: var(--ink); }
 .auth input { background: var(--card); }
+.how { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.how li { position: relative; padding-left: 28px; font-size: 0.93rem; line-height: 1.45; color: var(--ink); }
+.how li::before { content: ""; position: absolute; left: 0; top: 3px; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--cookie); box-shadow: inset 0 0 0 2px var(--cookie-edge), inset 0 0 0 4px var(--cookie); }
+.how kbd { font: 500 0.72rem var(--mono); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; background: var(--card); }
+.helplinks { display: flex; flex-wrap: wrap; gap: 6px 18px; }
 .devices { display: flex; flex-direction: column; gap: 10px; }
 .device-panel { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border-radius: 12px; background: var(--bg); border: 1.5px dashed var(--line); }
 .device-panel p { margin: 0; font-size: 0.9rem; }
@@ -389,8 +395,12 @@ header .text, .hero-side { animation: rise .7s var(--ease-out) both; }
 .cal:not([hidden]) { animation: drop .25s var(--ease-out); }
 .reveal .cal-day { animation: rise .35s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 18ms); }
 
+.welcome:not([hidden]) .how li { animation: rise .45s var(--ease-out) both; }
+.welcome:not([hidden]) .how li:nth-child(2) { animation-delay: .05s; } .welcome:not([hidden]) .how li:nth-child(3) { animation-delay: .1s; }
+.welcome:not([hidden]) .how li:nth-child(4) { animation-delay: .15s; } .welcome:not([hidden]) .how li:nth-child(5) { animation-delay: .2s; }
+.welcome:not([hidden]) .how li:nth-child(6) { animation-delay: .25s; } .welcome:not([hidden]) .how li:nth-child(7) { animation-delay: .3s; }
 /* small things */
-.sync:not([hidden]), .away-confirm:not([hidden]), .away-note:not([hidden]), .device-panel:not([hidden]), .link-note:not([hidden]), .auth-step:not([hidden]) { animation: drop .3s var(--ease-out); }
+.sync:not([hidden]), .welcome:not([hidden]), .away-confirm:not([hidden]), .away-note:not([hidden]), .device-panel:not([hidden]), .link-note:not([hidden]), .auth-step:not([hidden]) { animation: drop .3s var(--ease-out); }
 .streak-line:not([hidden]) { animation: rise .45s var(--ease-pop); }
 .react-btn:active:not(.off) { transform: scale(.9); }
 .react-btn.mine svg { transition: transform .2s var(--ease-pop); transform: scale(1.25); }
@@ -472,6 +482,22 @@ header .text, .hero-side { animation: rise .7s var(--ease-out) both; }
         <span class="status" id="syncStatus" role="status"></span>
       </div>
 
+      <div class="auth welcome" id="welcomeBox" hidden>
+        <p class="auth-title">Welcome! Here's how it works</p>
+        <ul class="how">
+          <li><strong>Rate the lunch.</strong> Tap 1 to 5 cookies and add a comment if you like. You can change it any time.</li>
+          <li><strong>Then see the results.</strong> Everyone's ratings stay hidden until you've rated. Missed lunch? Tap <em>I wasn't in the office</em> to see them anyway.</li>
+          <li><strong>Agree or disagree.</strong> Use ▲ and ▼ on other people's ratings. The most agreed-with show first.</li>
+          <li><strong>Keep your streak going.</strong> Rate every lunch day (<span id="howDays">Monday to Thursday</span>) for a 🔥. Out-of-office days count too.</li>
+          <li><strong>Check the weekly recap.</strong> Lunch of the week, awards, and who shares your taste.</li>
+          <li><strong>Get around.</strong> Tap the date to open the calendar, or press <kbd>←</kbd> <kbd>→</kbd>.</li>
+          <li><strong>On another laptop or phone?</strong> Type the same name there and your ratings come with you.</li>
+        </ul>
+        <div class="voterow">
+          <button class="btn primary" id="welcomeOk" type="button">Got it, let's rate</button>
+        </div>
+      </div>
+
       <form class="voteform" id="voteForm">
         <div class="field">
           <label class="eyebrow" for="voterName">Your name</label>
@@ -504,7 +530,10 @@ header .text, .hero-side { animation: rise .7s var(--ease-out) both; }
       <p class="streak-line" id="streakLine" hidden></p>
       <p class="kbd-hint">Tip: press <kbd>←</kbd> <kbd>→</kbd> to move between lunches.</p>
       <div class="devices">
-        <button class="linkbtn subtle" id="deviceBtn" type="button" aria-expanded="false" aria-controls="devicePanel">Use this on another laptop or phone</button>
+        <div class="helplinks">
+          <button class="linkbtn subtle" id="deviceBtn" type="button" aria-expanded="false" aria-controls="devicePanel">Use this on another laptop or phone</button>
+          <button class="linkbtn subtle" id="howBtn" type="button" aria-controls="welcomeBox">How does this work?</button>
+        </div>
         <div class="device-panel" id="devicePanel" hidden>
           <p>Open this link once on your other device. It'll show your ratings, streak and results there too, and anything that device already rated still counts as yours.</p>
           <pre id="deviceLink"></pre>
