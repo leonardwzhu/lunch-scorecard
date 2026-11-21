@@ -606,11 +606,11 @@
     const out = state.absences.filter((a) => a.day === state.day);
     const shared = out.filter((a) => (a.ate || "").trim());
     if (!shared.length) {
-      if (myAbsence(state.day)) { const p = el("p", "pending", "Nobody working from home has shared their lunch yet. Be the first above!"); const box = el("div", "athome"); box.append(el("h3", null, "Meanwhile, at home"), p); body.appendChild(box); }
+      if (myAbsence(state.day)) { const p = el("p", "pending", "Nobody who was out has shared their lunch yet. Be the first above!"); const box = el("div", "athome"); box.append(el("h3", null, "Meanwhile, out of office"), p); body.appendChild(box); }
       return;
     }
     const box = el("div", "athome"), ul = el("ul");
-    box.append(el("h3", null, "Meanwhile, at home"), ul);
+    box.append(el("h3", null, "Meanwhile, out of office"), ul);
     shared.forEach((a, i) => {
       const li = el("li"); li.style.setProperty("--i", i);
       const mid = el("div");
