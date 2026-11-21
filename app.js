@@ -454,7 +454,29 @@
     $("awayBtn").hidden = state.confirmingAway;
     $("awayConfirm").hidden = !state.confirmingAway;
     $("awayMsg").textContent = "";
+    $("ateForm").hidden = !(away && state.canShareAte);
+    if (away && document.activeElement !== $("ateInput") && $("ateForm").dataset.day !== state.day) {
+      $("ateInput").value = away.ate || "";
+      $("ateSave").textContent = away.ate ? "Update" : "Share";
+      $("ateStatus").textContent = "";
+      $("ateForm").dataset.day = state.day;
+    }
+    if (!away) delete $("ateForm").dataset.day;
   }
+  $("ateForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const away = myAbsence(state.day), st = $("ateStatus");
+    if (!away || !state.sb) return;
+    const ate = $("ateInput").value.trim().slice(0, 120);
+    $("ateSave").disabled = true; st.className = "status"; st.textContent = "Sharing…";
+    const { error } = await state.sb.from("absences").update({ ate }).eq("day", away.day).eq("voter_id", away.voter_id);
+    $("ateSave").disabled = false;
+    if (error) { st.className = "status err"; st.textContent = "Didn't save. Check your connection and try again."; return; }
+    away.ate = ate;
+    st.className = "status ok"; st.textContent = ate ? "Shared ✓" : "Removed";
+    $("ateSave").textContent = ate ? "Update" : "Share";
+    renderTally();
+  });
 
   // ---------- up/down votes on ratings ----------
   const reactionsFor = (day, rated) => state.reactions.filter((x) => x.day === day && x.rated_voter_id === rated);
@@ -544,7 +566,7 @@
            : "Nobody has rated this lunch yet. Be the first to tap a biscuit above.") + "</p></div></div>";
       return;
     }
-    if (!rs.length) { body.innerHTML = '<p class="empty-note">No ratings for this day yet.' + (canVoteDay() && !myAbsence(state.day) ? " Be the first to tap a biscuit above." : "") + "</p>"; return; }
+    if (!rs.length) { body.innerHTML = '<p class="empty-note">No ratings for this day yet.' + (canVoteDay() && !myAbsence(state.day) ? " Be the first to tap a biscuit above." : "") + "</p>"; renderAtHome(body); return; }
     const counts = [0, 0, 0, 0, 0, 0]; rs.forEach((r) => counts[r.stars]++);
     const max = Math.max(...counts);
     let html = '<div class="tally"><div class="badge">' + cookie(true, { dots: false }) + '<div><span class="num">' + avg(rs).toFixed(1) + '</span><span class="of">OUT OF 5</span></div></div><div class="dist">';
@@ -575,6 +597,29 @@
       li.style.setProperty("--i", list.children.length);
       li.append(avatar(r.voter_name, r.voter_id), mid, sc); list.appendChild(li);
     });
+    renderAtHome(body);
+  }
+
+  // What the out-of-office crowd had instead, so they're part of the day too.
+  function renderAtHome(body) {
+    if (!state.canShareAte) return;
+    const out = state.absences.filter((a) => a.day === state.day);
+    const shared = out.filter((a) => (a.ate || "").trim());
+    if (!shared.length) {
+      if (myAbsence(state.day)) { const p = el("p", "pending", "Nobody working from home has shared their lunch yet. Be the first above!"); const box = el("div", "athome"); box.append(el("h3", null, "Meanwhile, at home"), p); body.appendChild(box); }
+      return;
+    }
+    const box = el("div", "athome"), ul = el("ul");
+    box.append(el("h3", null, "Meanwhile, at home"), ul);
+    shared.forEach((a, i) => {
+      const li = el("li"); li.style.setProperty("--i", i);
+      const mid = el("div");
+      mid.append(el("div", "who", isMe(a.voter_id) ? "You" : (a.voter_name || "A coworker")), el("div", "had", a.ate));
+      li.append(avatar(a.voter_name, a.voter_id), mid); ul.appendChild(li);
+    });
+    const quiet = out.length - shared.length;
+    if (quiet) box.appendChild(el("p", "pending", quiet + " more " + (quiet === 1 ? "was" : "were") + " out and didn't say what they had."));
+    body.appendChild(box);
   }
 
   function reactionRow(r) {
@@ -930,10 +975,12 @@
     state.days = {}; d.data.forEach((r) => { state.days[r.day] = r.lunch; });
     state.votes = v.data;
     // These tables come from supabase/002_out_of_office_and_rating_votes.sql; the page still works without them.
-    const [a, x] = await Promise.all([
-      state.sb.from("absences").select("day, voter_id, voter_name").limit(10000),
+    let [a, x] = await Promise.all([
+      state.sb.from("absences").select("day, voter_id, voter_name, ate").limit(10000),
       state.sb.from("rating_votes").select("day, rated_voter_id, voter_id, value").limit(50000),
     ]);
+    state.canShareAte = !a.error;
+    if (a.error) a = await state.sb.from("absences").select("day, voter_id, voter_name").limit(10000); // before 005 is run
     state.extras = !a.error && !x.error;
     state.absences = a.error ? [] : a.data;
     state.reactions = x.error ? [] : x.data;

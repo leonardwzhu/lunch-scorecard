@@ -200,7 +200,7 @@ textarea { resize: vertical; min-height: 48px; }
 
 .voters { list-style: none; margin: 0; padding: 14px 0 0; display: flex; flex-direction: column; gap: 14px; border-top: 1.5px dashed var(--line); }
 .voters li { display: grid; grid-template-columns: 36px 1fr auto; gap: 12px; align-items: start; }
-.voters .avatar { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font: 700 0.8rem var(--body); color: #fff; }
+.voters .avatar, .athome .avatar { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font: 700 0.8rem var(--body); color: #fff; }
 .voters .who { font-weight: 700; font-size: 0.95rem; }
 .voters .note { color: var(--muted); font-size: 0.92rem; overflow-wrap: anywhere; }
 .voters .score { display: flex; gap: 1px; padding-top: 3px; }
@@ -293,6 +293,19 @@ textarea { resize: vertical; min-height: 48px; }
 .away-confirm { display: flex; flex-direction: column; gap: 12px; }
 .away-confirm p { margin: 0; color: var(--ink); }
 .away-note { background: var(--caramel-soft); border-radius: 12px; padding: 14px 16px; color: var(--ink); }
+.away-note { display: flex; flex-direction: column; gap: 12px; }
+.away-note p { margin: 0; }
+.ate { display: flex; flex-direction: column; gap: 6px; }
+.ate input { background: var(--card); }
+.athome { margin-top: 4px; padding-top: 14px; border-top: 1.5px dashed var(--line); display: flex; flex-direction: column; gap: 10px; }
+.athome h3 { margin: 0; font: 700 1rem var(--display); font-variation-settings: "SOFT" 100; color: var(--caramel-deep); }
+.athome ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.athome li { display: grid; grid-template-columns: 36px 1fr; gap: 12px; align-items: center; }
+.athome .who { font-weight: 700; font-size: 0.95rem; }
+.athome .had { color: var(--muted); font-size: 0.92rem; overflow-wrap: anywhere; }
+.athome .had::before { content: "had "; }
+.athome .pending { color: var(--muted); font-size: 0.85rem; font-style: italic; }
+.reveal .athome li { animation: rise .5s var(--ease-out) both; animation-delay: calc(.4s + var(--i, 0) * 60ms); }
 .react { display: flex; gap: 6px; margin-top: 6px; }
 .react-btn { display: inline-flex; align-items: center; gap: 4px; border: 1.5px solid var(--line); background: transparent; color: var(--muted); border-radius: 999px; padding: 2px 10px 2px 7px; font: 600 0.8rem var(--mono); font-variant-numeric: tabular-nums; cursor: pointer; transition: border-color .15s, background .15s, color .15s; }
 .react-btn svg { width: 12px; height: 12px; fill: currentColor; }
@@ -522,7 +535,7 @@ header .text, .hero-side { animation: rise .7s var(--ease-out) both; }
         <p class="auth-title">Welcome! Here's how it works</p>
         <ul class="how">
           <li><strong>Rate the lunch.</strong> Tap 1 to 5 biscuits and add a comment if you like. You can change it any time.</li>
-          <li><strong>Then see the results.</strong> Everyone's ratings stay hidden until you've rated. Missed lunch? Tap <em>I wasn't in the office</em> to see them anyway.</li>
+          <li><strong>Then see the results.</strong> Everyone's ratings stay hidden until you've rated. Missed lunch? Tap <em>I wasn't in the office</em> to see them anyway, and share what you had instead.</li>
           <li><strong>Agree or disagree.</strong> Use ▲ and ▼ on other people's ratings. The most agreed-with show first.</li>
           <li><strong>Keep your streak going.</strong> Rate every lunch day (<span id="howDays">Monday to Thursday</span>) for a 🔥. Out-of-office days count too.</li>
           <li><strong>Check the weekly recap.</strong> Lunch of the week, awards, and who shares your taste.</li>
@@ -585,8 +598,15 @@ header .text, .hero-side { animation: rise .7s var(--ease-out) both; }
         </div>
       </div>
       <div class="away-note" id="awayNote" hidden>
-        <strong>You were out of the office for this lunch.</strong>
-        You can see the results below, but you can't rate it.
+        <p><strong>You were out of the office for this lunch.</strong> You can see the results below, but you can't rate it.</p>
+        <form class="ate" id="ateForm" hidden>
+          <label class="eyebrow" for="ateInput">What did you have instead?</label>
+          <div class="editrow">
+            <input type="text" id="ateInput" maxlength="120" placeholder="e.g. leftover pad thai, cereal at 2pm" autocomplete="off">
+            <button class="btn primary" type="submit" id="ateSave">Share</button>
+          </div>
+          <span class="status" id="ateStatus" role="status"></span>
+        </form>
       </div>
     </div>
   </section>
