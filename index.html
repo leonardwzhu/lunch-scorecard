@@ -463,6 +463,51 @@ header .text, .hero-side { animation: rise .7s var(--ease-out) both; }
 .crumb { position: fixed; z-index: 60; width: 9px; height: 9px; margin: -4px 0 0 -4px; border-radius: 45% 55% 50% 40%; background: var(--cookie); pointer-events: none; animation: crumb .9s cubic-bezier(.2, .7, .4, 1) forwards; }
 .crumb:nth-child(3n) { background: var(--caramel-deep); width: 6px; height: 6px; }
 .dist .bar i, .alike .bar i { transition: width .5s var(--ease-out); }
+/* ---------- Biscuit Bets ---------- */
+.bet { margin-top: 14px; border: 2px solid var(--caramel); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 12px;
+  background: linear-gradient(160deg, var(--card), var(--caramel-soft)); }
+.bet-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.bet-title { font: 800 1.2rem var(--display); font-variation-settings: "SOFT" 100; color: var(--caramel-deep); }
+.bet-bal { font: 600 0.85rem var(--mono); color: var(--muted); }
+.bet-line { margin: 0; font-size: 1rem; }
+.bet-line strong { font: 900 1.6rem var(--display); font-variation-settings: "SOFT" 100; color: var(--ink); margin: 0 4px; vertical-align: -2px; }
+.bet-line small { color: var(--muted); font-size: 0.82rem; }
+.split { display: flex; flex-direction: column; gap: 4px; }
+.split-bar { display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: var(--crumb); }
+.split-bar .o { background: var(--ok); } .split-bar .u { background: var(--bad); }
+.split-legend { display: flex; justify-content: space-between; font: 500 0.78rem var(--mono); color: var(--muted); }
+.sides { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.side { border: 2px solid var(--line); background: var(--card); color: var(--ink); border-radius: 14px; padding: 12px 10px; cursor: pointer; font: 800 1.15rem var(--display);
+  font-variation-settings: "SOFT" 100; display: flex; flex-direction: column; align-items: center; gap: 2px; transition: transform .12s, border-color .15s, background .15s; }
+.side small { font: 500 0.75rem var(--body); color: var(--muted); }
+.side:hover { transform: translateY(-2px); }
+.side.over.on { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, var(--card)); }
+.side.under.on { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 12%, var(--card)); }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip-amt { border: 1.5px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 6px 14px; font: 600 0.9rem var(--mono); cursor: pointer; }
+.chip-amt.on { border-color: var(--caramel); background: var(--caramel-soft); color: var(--caramel-deep); }
+.chip-amt:disabled { opacity: 0.4; cursor: default; }
+.bet-placed { margin: 0; font-size: 0.95rem; }
+.bet-strip { margin-top: 2px; padding: 12px 14px; border-radius: 12px; background: var(--bg); display: flex; flex-direction: column; gap: 4px; font-size: 0.9rem; }
+.bet-strip .res { font-weight: 700; }
+.bet-strip .res.won { color: var(--ok); } .bet-strip .res.lost { color: var(--bad); }
+.bank-me { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: center; }
+.bank-me .coin { width: 84px; height: 61px; }
+.bank-me .coin svg { width: 100%; height: 100%; transform: rotate(-8deg); filter: drop-shadow(0 6px 10px rgba(120, 60, 20, 0.28)); }
+.bank-num { font: 900 2.4rem/1 var(--display); font-variation-settings: "SOFT" 100; font-variant-numeric: tabular-nums; }
+.bank-sub { color: var(--muted); font-size: 0.85rem; }
+.ledger { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.ledger li { display: grid; grid-template-columns: 4.2em 1fr; gap: 10px; font-size: 0.85rem; align-items: baseline; }
+.ledger .d { font: 700 0.85rem var(--mono); text-align: right; }
+.ledger .d.won { color: var(--ok); } .ledger .d.lost { color: var(--bad); } .ledger .d.pending, .ledger .d.push { color: var(--muted); }
+.ledger .t { color: var(--muted); overflow-wrap: anywhere; }
+.rich { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+.rich td { padding: 7px 4px; border-bottom: 1px dashed var(--line); }
+.rich tr:last-child td { border-bottom: none; }
+.rich .rk { font: 900 1rem var(--display); color: var(--caramel); width: 1.8em; }
+.rich .bal { text-align: right; font: 700 0.95rem var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rich .rec { color: var(--muted); font: 500 0.75rem var(--mono); white-space: nowrap; text-align: right; }
+.reveal .bet, .bet { animation: rise .45s var(--ease-out, ease) both; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
 </head>
@@ -536,6 +581,7 @@ header .text, .hero-side { animation: rise .7s var(--ease-out) both; }
         <ul class="how">
           <li><strong>Rate the lunch.</strong> Tap 1 to 5 biscuits and add a comment if you like. You can change it any time.</li>
           <li><strong>Then see the results.</strong> Everyone's ratings stay hidden until you've rated. Missed lunch? Tap <em>I wasn't in the office</em> to see them anyway, and share what you had instead.</li>
+          <li><strong>Place a bet.</strong> Before you peek, bet pretend biscuits on whether the lunch lands over or under today's line. Out of office? You can still play.</li>
           <li><strong>Agree or disagree.</strong> Use ▲ and ▼ on other people's ratings. The most agreed-with show first.</li>
           <li><strong>Keep your streak going.</strong> Rate every lunch day (<span id="howDays">Monday to Thursday</span>) for a 🔥. Out-of-office days count too.</li>
           <li><strong>Check the weekly recap.</strong> Lunch of the week, awards, and who shares your taste.</li>
@@ -627,6 +673,14 @@ header .text, .hero-side { animation: rise .7s var(--ease-out) both; }
     <div id="tallyBody"><p class="empty-note">Loading ratings…</p></div>
   </section>
 
+  <section class="card o2 bank" id="bankCard" aria-labelledby="bankTitle" hidden>
+    <div class="card-head">
+      <h2 id="bankTitle">Biscuit Bank</h2>
+      <span class="eyebrow">Pretend biscuits · real bragging rights</span>
+    </div>
+    <div id="bankBody"></div>
+  </section>
+
   <section class="card o4" aria-labelledby="recapTitle">
     <div class="card-head">
       <h2 id="recapTitle">Weekly recap</h2>
@@ -662,6 +716,7 @@ header .text, .hero-side { animation: rise .7s var(--ease-out) both; }
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
 <script src="insights.js"></script>
+<script src="bets.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
