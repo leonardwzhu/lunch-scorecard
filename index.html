@@ -356,6 +356,11 @@ textarea { resize: vertical; min-height: 48px; }
 .board .avg { text-align: right; white-space: nowrap; }
 .board .avg span { display: inline-flex; align-items: center; gap: 5px; font: 700 1.05rem var(--display); font-variation-settings: "SOFT" 100; font-variant-numeric: tabular-nums; }
 .board .avg svg { width: 24px; height: 17px; }
+.trend { font: 700 0.8rem var(--mono); }
+.trend.up { color: var(--ok); } .trend.down { color: var(--bad); } .trend.same { color: var(--muted); }
+.board .avg .trend { display: block; text-align: right; margin-top: 2px; }
+.lasttime { margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--bg); font-size: 0.9rem; color: var(--muted); }
+.lasttime .trend { margin-left: 4px; }
 .pill { display: inline-block; font: 600 0.66rem var(--mono); letter-spacing: 0.04em; padding: 2px 8px; border-radius: 999px; margin-left: 6px; vertical-align: 2px; }
 .pill.good { background: var(--caramel-soft); color: var(--caramel-deep); }
 .pill.bad { background: color-mix(in srgb, var(--bad) 14%, transparent); color: var(--bad); }

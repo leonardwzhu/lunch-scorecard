@@ -569,6 +569,28 @@
     return '<button type="button" class="out-count" data-tip="' + attr(heading + ":\n" + names.join(names.length > 10 ? ", " : "\n")) +
       '" aria-label="' + attr(label + ": " + names.join(", ")) + '">' + label + "</button>";
   }
+  // For a repeat lunch: how it did the previous time it was served (only if you can already see that day).
+  function previousVisit(day) {
+    const name = (state.days[day] || "").trim().toLowerCase();
+    if (!name) return null;
+    const prev = Object.keys(state.days).filter((d) => d < day && (state.days[d] || "").trim().toLowerCase() === name && ratingsFor(d).length).sort().pop();
+    if (!prev || resultsHidden(prev)) return null;
+    return { day: prev, avg: avg(ratingsFor(prev)) };
+  }
+  function trendBits(now, before) {
+    const r1 = (x) => Number(x.toFixed(1)); // compare the numbers people actually see
+    const diff = Math.round((r1(now) - r1(before)) * 10) / 10;
+    if (Math.abs(diff) < 0.05) return { cls: "same", text: "same as before" };
+    return diff > 0 ? { cls: "up", text: "↑ " + diff.toFixed(1) } : { cls: "down", text: "↓ " + Math.abs(diff).toFixed(1) };
+  }
+  function lastTimeLine(day, now) {
+    const pv = previousVisit(day);
+    if (!pv) return "";
+    const t = trendBits(now, pv.avg);
+    return '<p class="lasttime">Last time: ' + pv.avg.toFixed(1) + " on " + pretty(pv.day, { weekday: "short", month: "short", day: "numeric" }) +
+      ' <span class="trend ' + t.cls + '">' + t.text + "</span></p>";
+  }
+
   function renderTally() {
     const body = $("tallyBody");
     if (!state.loaded) return;
@@ -590,6 +612,7 @@
     const out = outList.length;
     const outBtn = out ? " · " + namesPop(out + " out of office", "Out of office", outList) : "";
     html += '</div><span class="sub">' + namesPop(rs.length + " rating" + (rs.length > 1 ? "s" : ""), "Rated by", rs) + " so far" + outBtn + "</span></div>";
+    html += lastTimeLine(state.day, avg(rs));
     html += '<ul class="voters" id="voterList"></ul>';
     body.innerHTML = html;
     if (playOnce(body, state.day + "|open")) countUp(body.querySelector(".badge .num"), avg(rs), 1);
@@ -696,6 +719,12 @@
       const tdA = document.createElement("td"); tdA.className = "avg";
       const av = document.createElement("span"); av.textContent = r.avg.toFixed(1); av.appendChild(cookieEl(true, { dots: false }));
       av.setAttribute("aria-label", r.avg.toFixed(1) + " out of 5"); tdA.appendChild(av);
+      if (r.days.length > 1) { // served more than once: latest visit vs the one before
+        const ds = r.days.slice().sort(), dayAvg = (d) => avg(ratingsFor(d));
+        const t = trendBits(dayAvg(ds[ds.length - 1]), dayAvg(ds[ds.length - 2]));
+        const tr2 = document.createElement("span"); tr2.className = "trend " + t.cls; tr2.textContent = t.cls === "same" ? "=" : t.text.replace(" ", "");
+        tr2.title = "Last visit vs the one before: " + t.text; tr2.setAttribute("aria-label", tr2.title); tdA.appendChild(tr2);
+      }
       tr.style.setProperty("--i", i);
       tr.append(tdR, tdD, tdA); tb.appendChild(tr);
     });
