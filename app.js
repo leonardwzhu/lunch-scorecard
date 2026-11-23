@@ -554,6 +554,13 @@
     renderCal(); renderSync(); renderAway(); renderStreak(); renderTally(); renderBoard(); renderRecap(); renderTaste(); renderShare();
   }
 
+  // "8 ratings" / "2 out of office": hover, focus or tap to see who. Names only, never scores.
+  function namesPop(label, heading, ids) {
+    const attr = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    const names = ids.map((r) => (isMe(r.voter_id) ? "You" : (r.voter_name || "A coworker")));
+    return '<button type="button" class="out-count" data-tip="' + attr(heading + ":\n" + names.join(names.length > 10 ? ", " : "\n")) +
+      '" aria-label="' + attr(label + ": " + names.join(", ")) + '">' + label + "</button>";
+  }
   function renderTally() {
     const body = $("tallyBody");
     if (!state.loaded) return;
@@ -562,7 +569,7 @@
       const n = rs.length;
       playOnce(body, state.day + "|locked");
       body.innerHTML = '<div class="locked">' + cookie(false, { face: 3 }) + '<div><p class="locked-title">Rate it to see the results</p><p class="empty-note">' +
-        (n ? n + (n === 1 ? " coworker has" : " coworkers have") + " rated this lunch. Results appear once you've added yours" + (state.extras ? ", or said you were out of the office." : ".")
+        (n ? namesPop(n + (n === 1 ? " coworker" : " coworkers"), "Rated so far", rs) + (n === 1 ? " has" : " have") + " rated this lunch. Results appear once you've added yours" + (state.extras ? ", or said you were out of the office." : ".")
            : "Nobody has rated this lunch yet. Be the first to tap a biscuit above.") + "</p></div></div>";
       return;
     }
@@ -573,11 +580,8 @@
     for (let i = 5; i >= 1; i--) html += '<div class="row"><span class="lbl">' + i + cookie(true, { dots: false }) + '</span><span class="bar"><i style="width:' + (max ? (counts[i] / max) * 100 : 0) + '%"></i></span><span>' + counts[i] + "</span></div>";
     const outList = state.absences.filter((a) => a.day === state.day);
     const out = outList.length;
-    // Hover (or tap) "N out of office" to see who was out.
-    const attr = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-    const outTip = outList.map((a) => (isMe(a.voter_id) ? "You" : (a.voter_name || "A coworker"))).join("\n");
-    const outBtn = out ? ' · <button type="button" class="out-count" data-tip="' + attr("Out of office:\n" + outTip) + '" aria-label="' + attr(out + " out of office: " + outTip.replace(/\n/g, ", ")) + '">' + out + " out of office</button>" : "";
-    html += '</div><span class="sub">' + rs.length + " rating" + (rs.length > 1 ? "s" : "") + " so far" + outBtn + "</span></div>";
+    const outBtn = out ? " · " + namesPop(out + " out of office", "Out of office", outList) : "";
+    html += '</div><span class="sub">' + namesPop(rs.length + " rating" + (rs.length > 1 ? "s" : ""), "Rated by", rs) + " so far" + outBtn + "</span></div>";
     html += '<ul class="voters" id="voterList"></ul>';
     body.innerHTML = html;
     if (playOnce(body, state.day + "|open")) countUp(body.querySelector(".badge .num"), avg(rs), 1);
