@@ -1,5 +1,6 @@
 (function () {
   "use strict";
+  const MIN_REVIEW = 3; // characters; every new or changed rating needs a short written review
   const LABELS = ["", "1 · Burnt", "2 · Underbaked", "3 · Fine", "4 · Golden", "5 · Perfectly caramelised"];
 
   // A caramelised biscuit: a wide rounded rectangle with a crimped edge, a raised inner border and a few
@@ -130,7 +131,9 @@
     b.setAttribute("role", "radio"); b.setAttribute("aria-label", i + " biscuit" + (i > 1 ? "s" : ""));
     b.innerHTML = cookie(false, { face: i });
     b.addEventListener("click", () => {
-      state.pick = i; state.dirty = true; paintStars(); updateSubmit(); scheduleSave();
+      state.pick = i; state.dirty = true; paintStars(); updateSubmit();
+      $("voteStatus").textContent = "";
+      if ($("comment").value.trim().length < MIN_REVIEW) $("comment").focus({ preventScroll: true });
       for (let j = 1; j <= i; j++) { const s = $("star" + j); s.classList.remove("pop"); void s.offsetWidth; s.style.animationDelay = (j - 1) * 40 + "ms"; s.classList.add("pop"); }
     });
     b.addEventListener("mouseenter", () => paintStars(i));
@@ -158,15 +161,18 @@
 
   const myVote = (day) => state.votes.find((v) => v.day === day && isMe(v.voter_id));
   // Tapping a cookie saves on its own; this button only appears for an unsaved comment or name change.
+  // A rating saves together with a short written review, which is required.
   function updateSubmit() {
     const mv = myVote(state.day);
     const comment = $("comment").value.trim(), name = $("voterName").value.trim();
-    const commentChanged = comment !== ((mv && mv.comment) || "");
-    const nameChanged = !!mv && name !== (mv.voter_name || "");
-    $("saveRow").hidden = !(state.sb && canVoteDay() && !myAbsence(state.day) && (commentChanged || nameChanged));
-    $("submitVote").disabled = !state.pick;
-    $("submitVote").textContent = commentChanged ? "Save comment" : "Save name";
-    $("saveHint").textContent = state.pick ? "" : "Tap a biscuit and your comment saves with your rating.";
+    const changed = !mv || mv.stars !== state.pick || comment !== (mv.comment || "") || name !== (mv.voter_name || "");
+    const open = state.sb && canVoteDay() && !myAbsence(state.day);
+    $("saveRow").hidden = !(open && (state.pick || comment) && changed);
+    const short = comment.length < MIN_REVIEW;
+    $("submitVote").disabled = !state.pick || short;
+    $("submitVote").textContent = mv ? "Update rating" : "Save rating";
+    $("saveHint").textContent = !state.pick ? "Tap a biscuit to pick your score."
+      : short ? "Write a short review to save your rating." : "";
   }
   $("comment").addEventListener("input", () => { state.dirty = true; updateSubmit(); });
   $("voterName").addEventListener("input", () => { store("lunch.name", $("voterName").value.trim()); updateSubmit(); });
@@ -317,6 +323,7 @@
       clearTimeout(inner._t); inner._t = setTimeout(() => inner.classList.remove("slide-next", "slide-prev"), 500);
     }
     state.day = d; state.editing = false; state.confirmingAway = false;
+    $("resultsPill").hidden = true; // it points at a different day's results
     loadMyVoteIntoForm();
     $("voteStatus").textContent = ""; $("voteStatus").className = "status";
     render();
@@ -374,6 +381,7 @@
     saveTimer = null;
     if (saving) { savePending = true; return; }
     if (!state.pick || !state.sb || !canVoteDay()) return;
+    if ($("comment").value.trim().length < MIN_REVIEW) { updateSubmit(); $("comment").focus(); return; }
     const firstToday = !myVote(state.day);
     const synced = autoSyncByName($("voterName").value);
     const existing = myVote(state.day); // after a sync, this can be a rating made on another device
@@ -535,7 +543,7 @@
 
   function render() {
     const isToday = state.day === lunchToday;
-    $("dateLabel").textContent = isToday && lunchToday === today ? "Today · " + pretty(state.day, { month: "short", day: "numeric" }) : pretty(state.day);
+    $("dateLabel").textContent = isToday && lunchToday === today ? "Today · " + pretty(state.day, { month: "short", day: "numeric" }) : pretty(state.day, { weekday: "short", month: "short", day: "numeric" });
     $("nextDay").disabled = stepWorkday(state.day, 1) > today;
     $("goToday").hidden = isToday;
     $("lunchEyebrow").textContent = isToday && lunchToday === today ? "On the menu today" : "On the menu that day";

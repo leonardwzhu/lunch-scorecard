@@ -250,6 +250,7 @@ textarea { resize: vertical; min-height: 48px; }
   .podium, .awards { grid-template-columns: 1fr; }
 }
 .linkbtn.subtle { color: var(--muted); font-weight: 500; }
+.req { text-transform: none; letter-spacing: 0; font-family: var(--body); color: var(--muted); }
 .namechip { margin: 0; color: var(--muted); font-size: 0.92rem; }
 .namechip strong { color: var(--ink); }
 .ratingline { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; min-height: 1.5em; }
@@ -546,7 +547,7 @@ header .text, .hero-side { animation: rise .7s var(--ease-out) both; }
       <div class="auth welcome" id="welcomeBox" hidden>
         <p class="auth-title">Welcome! Here's how it works</p>
         <ul class="how">
-          <li><strong>Rate the lunch.</strong> Tap 1 to 5 biscuits and add a comment if you like. You can change it any time.</li>
+          <li><strong>Rate the lunch.</strong> Tap 1 to 5 biscuits and write a short review. You can change it any time.</li>
           <li><strong>Then see the results.</strong> Everyone's ratings stay hidden until you've rated. Missed lunch? Tap <em>I wasn't in the office</em> to see them anyway, and share what you had instead.</li>
           <li><strong>Agree or disagree.</strong> Use ▲ and ▼ on other people's ratings. The most agreed-with show first.</li>
           <li><strong>Keep your streak going.</strong> Rate every lunch day (<span id="howDays">Monday to Thursday</span>) for a 🔥. Out-of-office days count too.</li>
@@ -573,7 +574,10 @@ header .text, .hero-side { animation: rise .7s var(--ease-out) both; }
             <span class="status" id="voteStatus" role="status"></span>
           </div>
         </div>
-        <textarea id="comment" maxlength="200" rows="2" placeholder="Optional: what made it good or bad?" aria-label="Comment"></textarea>
+        <div class="field">
+          <label class="eyebrow" for="comment">Your review <span class="req">(required)</span></label>
+          <textarea id="comment" maxlength="200" rows="2" placeholder="What made it good or bad?" required></textarea>
+        </div>
         <div class="voterow" id="saveRow" hidden>
           <button class="btn primary" type="submit" id="submitVote">Save comment</button>
           <span class="empty-note" id="saveHint"></span>
