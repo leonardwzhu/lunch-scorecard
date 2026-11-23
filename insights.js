@@ -132,7 +132,7 @@
       if (hot) hot.name = hot.names.length > 3 ? hot.names.slice(0, 3).join(", ") + " + " + (hot.names.length - 3) + " more" : hot.names.join(" & ").replace(/ & (?=.* & )/g, ", ");
 
       const outCount = absences.filter((a) => shown.has(a.day)).length;
-      return { monday, best, worst, comment, harshest, easiest, contrarian, agreed, hot, lunches: rated.length, ratings: weekVotes.length, outCount, hiddenCount };
+      return { monday, ranked: byAvg, best, worst, comment, harshest, easiest, contrarian, agreed, hot, lunches: rated.length, ratings: weekVotes.length, outCount, hiddenCount };
     }
 
     return { streakFor, myStreak: me ? streaks.get(me.key) || 0 : 0, taste, recap };

@@ -768,31 +768,59 @@
     body.appendChild(el("p", "recap-foot", foot));
   }
 
+  // "The Weekly Crumb": the recap as a little newsletter for Teams. Built as rich text (bold headings) with a
+  // plain-text twin, so it pastes nicely wherever it goes.
   function recapForTeams() {
     const monday = state.recapMonday;
     const r = state.ins.recap(monday, weekDates(monday), lunchNameOf, true);
-    const L = ["🍪 Lunch recap · week of " + pretty(monday, { month: "short", day: "numeric" })];
-    if (r.best) L.push("🏆 Lunch of the week: " + r.best.name + " (" + r.best.avg.toFixed(1) + ")");
-    if (r.worst) L.push("😬 Biggest letdown: " + r.worst.name + " (" + r.worst.avg.toFixed(1) + ")");
-    if (r.comment) L.push("💬 Comment of the week: \u201C" + r.comment.text + "\u201D (" + r.comment.by + ", +" + r.comment.score + ")");
-    if (r.hot) L.push("🔥 Hottest streak: " + r.hot.name + " (" + r.hot.n + " lunches in a row)");
-    if (r.agreed) L.push("👍 Most agreed-with: " + r.agreed.name + " (+" + r.agreed.score + ")");
-    if (r.harshest) L.push("🧐 Harshest critic: " + r.harshest.name + " (avg " + r.harshest.avg.toFixed(1) + ")");
-    if (r.easiest) L.push("🥰 Easiest to please: " + r.easiest.name + " (avg " + r.easiest.avg.toFixed(1) + ")");
-    if (r.contrarian) L.push("🙃 Contrarian: " + r.contrarian.name);
+    const days = weekDates(monday);
+    const md = (d, withMonth) => parseYmd(d).toLocaleDateString(undefined, withMonth ? { month: "short", day: "numeric" } : { day: "numeric" });
+    const first = days[0], last = days[days.length - 1];
+    const range = first.slice(0, 7) === last.slice(0, 7) ? md(first, true) + "–" + md(last) : md(first, true) + " – " + md(last, true);
+    const biscuits = (a) => "🍪".repeat(Math.min(5, Math.max(1, Math.round(a))));
+    const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    const link = location.href.split("#")[0].split("?")[0];
+
+    // Each block is a heading plus lines; both formats come from the same list.
+    const blocks = [];
+    if (r.ranked && r.ranked.length) {
+      const medals = ["🏆", "🥈", "🥉"];
+      blocks.push({ head: "🍽️ This week's menu, ranked", lines: r.ranked.map((x, i) => {
+        const tag = r.ranked.length > 1 && i === r.ranked.length - 1 && i > 0 ? "😬" : (medals[i] || (i + 1) + ".");
+        return tag + " " + x.name + "  " + biscuits(x.avg) + " " + x.avg.toFixed(1);
+      }) });
+    }
+    if (r.comment) blocks.push({ head: "💬 Quote of the week", lines: ["\u201C" + r.comment.text + "\u201D", "   ~ " + r.comment.by + " (+" + r.comment.score + ")"] });
+    const awards = [];
+    if (r.hot) awards.push("🔥 Hottest streak · " + r.hot.name + " (" + r.hot.n + " in a row)");
+    if (r.agreed) awards.push("👍 Most agreed-with · " + r.agreed.name);
+    if (r.harshest) awards.push("🧐 Harshest critic · " + r.harshest.name + " (avg " + r.harshest.avg.toFixed(1) + ")");
+    if (r.easiest) awards.push("🥰 Easiest to please · " + r.easiest.name + " (avg " + r.easiest.avg.toFixed(1) + ")");
+    if (r.contrarian) awards.push("🙃 Contrarian · " + r.contrarian.name);
     const pair = state.ins.taste.closestPair;
-    if (pair) L.push("👯 Taste twins: " + pair.aReal + " & " + pair.bReal + " (" + similarity(pair.gap) + "% alike)");
-    L.push(r.lunches + " lunches · " + r.ratings + " ratings" + (r.outCount ? " · " + r.outCount + " out of office" : ""));
-    L.push("Rate today's lunch: " + location.href.split("#")[0].split("?")[0]);
-    return L.join("\n");
+    if (pair) awards.push("👯 Taste twins · " + pair.aReal + " & " + pair.bReal + " (" + similarity(pair.gap) + "% alike)");
+    if (awards.length) blocks.push({ head: "🎖️ This week's awards", lines: awards });
+
+    const stats = "📊 " + r.lunches + " lunch" + (r.lunches === 1 ? "" : "es") + " · " + r.ratings + " rating" + (r.ratings === 1 ? "" : "s") + (r.outCount ? " · " + r.outCount + " out of office" : "");
+    const text = ["🍪 THE WEEKLY CRUMB 🍪", "Lunch recap · " + range, ""]
+      .concat(...blocks.map((b) => [b.head, ...b.lines, ""]))
+      .concat([stats, "👉 Rate lunches here: " + link]).join("\n");
+    const html = "<p><b>🍪 THE WEEKLY CRUMB 🍪</b><br><i>Lunch recap · " + esc(range) + "</i></p>" +
+      blocks.map((b) => "<p><b>" + esc(b.head) + "</b><br>" + b.lines.map((l, i) => b.head.startsWith("💬") && i === 0 ? "<i>" + esc(l) + "</i>" : esc(l)).join("<br>") + "</p>").join("") +
+      "<p>" + esc(stats) + "<br>👉 <a href=\"" + esc(link) + "\">Rate lunches here</a></p>";
+    return { text, html };
   }
   $("copyRecap").addEventListener("click", () => {
     if (!state.ins) return;
-    const text = recapForTeams(), st = $("recapStatus"), pre = $("recapText");
-    pre.textContent = text;
-    const fallback = () => { pre.hidden = false; const rg = document.createRange(); rg.selectNodeContents(pre); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(rg); st.className = "status"; st.textContent = "Text selected. Press Ctrl+C to copy."; };
+    const { text, html } = recapForTeams(), st = $("recapStatus"), pre = $("recapText");
+    pre.textContent = text; pre.hidden = false; // show a preview of what was copied
+    const done = () => { st.className = "status ok"; st.textContent = "Copied. Paste it in Teams."; };
+    const fallback = () => { const rg = document.createRange(); rg.selectNodeContents(pre); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(rg); st.className = "status"; st.textContent = "Text selected. Press Ctrl+C to copy."; };
     if (!navigator.clipboard) return fallback();
-    navigator.clipboard.writeText(text).then(() => { st.className = "status ok"; st.textContent = "Copied. Paste it in Teams."; }, fallback);
+    const plain = () => navigator.clipboard.writeText(text).then(done, fallback);
+    if (window.ClipboardItem && navigator.clipboard.write) {
+      navigator.clipboard.write([new ClipboardItem({ "text/html": new Blob([html], { type: "text/html" }), "text/plain": new Blob([text], { type: "text/plain" }) })]).then(done, plain);
+    } else plain();
   });
 
   const similarity = (gap) => Math.round((1 - gap / 4) * 100);
