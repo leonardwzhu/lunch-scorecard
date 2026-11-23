@@ -571,8 +571,13 @@
     const max = Math.max(...counts);
     let html = '<div class="tally"><div class="badge">' + cookie(true, { dots: false }) + '<div><span class="num">' + avg(rs).toFixed(1) + '</span><span class="of">OUT OF 5</span></div></div><div class="dist">';
     for (let i = 5; i >= 1; i--) html += '<div class="row"><span class="lbl">' + i + cookie(true, { dots: false }) + '</span><span class="bar"><i style="width:' + (max ? (counts[i] / max) * 100 : 0) + '%"></i></span><span>' + counts[i] + "</span></div>";
-    const out = state.absences.filter((a) => a.day === state.day).length;
-    html += '</div><span class="sub">' + rs.length + " rating" + (rs.length > 1 ? "s" : "") + " so far" + (out ? " · " + out + " out of office" : "") + "</span></div>";
+    const outList = state.absences.filter((a) => a.day === state.day);
+    const out = outList.length;
+    // Hover (or tap) "N out of office" to see who, and what they had if they shared it.
+    const attr = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    const outTip = outList.map((a) => (isMe(a.voter_id) ? "You" : (a.voter_name || "A coworker")) + ((a.ate || "").trim() ? " (had " + a.ate.trim() + ")" : "")).join("\n");
+    const outBtn = out ? ' · <button type="button" class="out-count" data-tip="' + attr("Out of office:\n" + outTip) + '" aria-label="' + attr(out + " out of office: " + outTip.replace(/\n/g, ", ")) + '">' + out + " out of office</button>" : "";
+    html += '</div><span class="sub">' + rs.length + " rating" + (rs.length > 1 ? "s" : "") + " so far" + outBtn + "</span></div>";
     html += '<ul class="voters" id="voterList"></ul>';
     body.innerHTML = html;
     if (playOnce(body, state.day + "|open")) countUp(body.querySelector(".badge .num"), avg(rs), 1);
@@ -882,6 +887,12 @@
   }
   document.addEventListener("click", (e) => {
     if (!$("rentBubble").hidden && !e.target.closest(".hero-side")) { $("rentBubble").hidden = true; $("rentJoke").setAttribute("aria-expanded", "false"); }
+  });
+
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest && e.target.closest(".out-count");
+    document.querySelectorAll(".out-count.open").forEach((b) => { if (b !== btn) b.classList.remove("open"); });
+    if (btn) btn.classList.toggle("open");
   });
 
   // ---------- "voted before?" sync by name ----------
