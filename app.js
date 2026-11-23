@@ -119,6 +119,7 @@
     votes: [],   // rows from the votes table
     absences: [],   // who was out of the office, per day
     reactions: [],  // up/down votes on people's ratings
+    oooVotes: [], oooOn: false, // up/down votes on out-of-office meals (006_out_of_office_votes.sql)
     extras: true,   // false until the 002 SQL has been run in Supabase
     loaded: false, pick: 0, dirty: false, editing: false, confirmingAway: false,
   };
@@ -655,11 +656,54 @@
       const li = el("li"); li.style.setProperty("--i", i);
       const mid = el("div");
       mid.append(el("div", "who", isMe(a.voter_id) ? "You" : (a.voter_name || "A coworker")), el("div", "had", a.ate));
+      if (state.oooOn) mid.appendChild(oooVoteRow(a));
       li.append(avatar(a.voter_name, a.voter_id), mid); ul.appendChild(li);
     });
     const quiet = out.length - shared.length;
     if (quiet) box.appendChild(el("p", "pending", quiet + " more " + (quiet === 1 ? "was" : "were") + " out and didn't say what they had."));
     body.appendChild(box);
+  }
+
+  // ---------- up/down votes on out-of-office meals (same buttons as on ratings) ----------
+  function oooTally(a) {
+    let up = 0, down = 0, mine = 0, mineId = null; const upBy = [], downBy = [];
+    state.oooVotes.forEach((x) => {
+      if (x.day !== a.day || x.ooo_voter_id !== a.voter_id) return;
+      const who = isMe(x.voter_id) ? "You" : (x.voter_name || "A coworker");
+      if (x.value === 1) { up++; upBy.push(who); } else if (x.value === -1) { down++; downBy.push(who); }
+      if (isMe(x.voter_id)) { mine = x.value; mineId = x.voter_id; }
+    });
+    return { up, down, mine, mineId, upBy, downBy };
+  }
+  function oooVoteRow(a) {
+    const t = oooTally(a), own = isMe(a.voter_id);
+    const row = el("div", "react");
+    const whose = own ? "your meal" : (a.voter_name || "this coworker") + "'s meal";
+    [[1, "up", t.up, t.upBy, "Upvoted by "], [-1, "down", t.down, t.downBy, "Downvoted by "]].forEach(([val, cls, n, by, byLabel]) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "react-btn " + cls + (t.mine === val ? " mine" : "");
+      const off = own || !state.sb;
+      b.classList.toggle("off", off);
+      if (off) b.setAttribute("aria-disabled", "true");
+      b.setAttribute("aria-pressed", String(t.mine === val));
+      const list = by.length ? byLabel + by.join(", ") : (val === 1 ? "No upvotes yet" : "No downvotes yet");
+      b.dataset.tip = list + (own ? " · You can't vote on your own meal" : "");
+      b.setAttribute("aria-label", (val === 1 ? "Upvote " : "Downvote ") + whose + ". " + list);
+      b.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="' + (val === 1 ? "M8 3l5 6H3z" : "M8 13L3 7h10z") + '"/></svg>';
+      b.appendChild(el("span", null, String(n)));
+      b.addEventListener("click", () => { if (!off) voteOoo(a, val); });
+      row.appendChild(b);
+    });
+    return row;
+  }
+  async function voteOoo(a, value) {
+    const t = oooTally(a);
+    const row = { day: a.day, ooo_voter_id: a.voter_id, voter_id: t.mineId || voterId,
+      voter_name: $("voterName").value.trim().slice(0, 40), value: t.mine === value ? 0 : value };
+    const prev = state.oooVotes.slice();
+    mergeRow(state.oooVotes, row, ["day", "ooo_voter_id", "voter_id"]); renderTally(); // show it right away
+    const { error } = await state.sb.from("ooo_votes").upsert(row);
+    if (error) { state.oooVotes = prev; renderTally(); banner("Your vote didn't save. Check your connection and try again."); }
   }
 
   function reactionRow(r) {
@@ -1057,6 +1101,9 @@
     state.extras = !a.error && !x.error;
     state.absences = a.error ? [] : a.data;
     state.reactions = x.error ? [] : x.data;
+    const o = await state.sb.from("ooo_votes").select("day, ooo_voter_id, voter_id, voter_name, value").limit(20000);
+    state.oooOn = !o.error; // from 006_out_of_office_votes.sql; the page works without it
+    state.oooVotes = o.error ? [] : o.data;
     const first = !state.loaded;
     state.loaded = true;
     if (first || !state.dirty) loadMyVoteIntoForm();
@@ -1077,6 +1124,9 @@
     })
     .on("postgres_changes", { event: "*", schema: "public", table: "absences" }, (p) => {
       if (p.new && p.new.day) { mergeRow(state.absences, p.new, ["day", "voter_id"]); render(); }
+    })
+    .on("postgres_changes", { event: "*", schema: "public", table: "ooo_votes" }, (p) => {
+      if (p.new && p.new.day) { mergeRow(state.oooVotes, p.new, ["day", "ooo_voter_id", "voter_id"]); renderTally(); }
     })
     .on("postgres_changes", { event: "*", schema: "public", table: "rating_votes" }, (p) => {
       if (p.new && p.new.day) { mergeRow(state.reactions, p.new, ["day", "rated_voter_id", "voter_id"]); renderTally(); }
