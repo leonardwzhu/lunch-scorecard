@@ -573,9 +573,9 @@
     for (let i = 5; i >= 1; i--) html += '<div class="row"><span class="lbl">' + i + cookie(true, { dots: false }) + '</span><span class="bar"><i style="width:' + (max ? (counts[i] / max) * 100 : 0) + '%"></i></span><span>' + counts[i] + "</span></div>";
     const outList = state.absences.filter((a) => a.day === state.day);
     const out = outList.length;
-    // Hover (or tap) "N out of office" to see who, and what they had if they shared it.
+    // Hover (or tap) "N out of office" to see who was out.
     const attr = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-    const outTip = outList.map((a) => (isMe(a.voter_id) ? "You" : (a.voter_name || "A coworker")) + ((a.ate || "").trim() ? " (had " + a.ate.trim() + ")" : "")).join("\n");
+    const outTip = outList.map((a) => (isMe(a.voter_id) ? "You" : (a.voter_name || "A coworker"))).join("\n");
     const outBtn = out ? ' · <button type="button" class="out-count" data-tip="' + attr("Out of office:\n" + outTip) + '" aria-label="' + attr(out + " out of office: " + outTip.replace(/\n/g, ", ")) + '">' + out + " out of office</button>" : "";
     html += '</div><span class="sub">' + rs.length + " rating" + (rs.length > 1 ? "s" : "") + " so far" + outBtn + "</span></div>";
     html += '<ul class="voters" id="voterList"></ul>';
