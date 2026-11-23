@@ -768,8 +768,7 @@
     body.appendChild(el("p", "recap-foot", foot));
   }
 
-  // "The Weekly Crumb": the recap as a little newsletter for Teams. Built as rich text (bold headings) with a
-  // plain-text twin, so it pastes nicely wherever it goes.
+  // The recap for Teams: plain and tidy. Copied as rich text (bold headings, a real link) with a plain-text twin.
   function recapForTeams() {
     const monday = state.recapMonday;
     const r = state.ins.recap(monday, weekDates(monday), lunchNameOf, true);
@@ -777,37 +776,31 @@
     const md = (d, withMonth) => parseYmd(d).toLocaleDateString(undefined, withMonth ? { month: "short", day: "numeric" } : { day: "numeric" });
     const first = days[0], last = days[days.length - 1];
     const range = first.slice(0, 7) === last.slice(0, 7) ? md(first, true) + "–" + md(last) : md(first, true) + " – " + md(last, true);
-    const biscuits = (a) => "🍪".repeat(Math.min(5, Math.max(1, Math.round(a))));
     const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
     const link = location.href.split("#")[0].split("?")[0];
+    const plural = (n, w) => n + " " + w + (n === 1 ? "" : "s");
 
-    // Each block is a heading plus lines; both formats come from the same list.
     const blocks = [];
-    if (r.ranked && r.ranked.length) {
-      const medals = ["🏆", "🥈", "🥉"];
-      blocks.push({ head: "🍽️ This week's menu, ranked", lines: r.ranked.map((x, i) => {
-        const tag = r.ranked.length > 1 && i === r.ranked.length - 1 && i > 0 ? "😬" : (medals[i] || (i + 1) + ".");
-        return tag + " " + x.name + "  " + biscuits(x.avg) + " " + x.avg.toFixed(1);
-      }) });
-    }
-    if (r.comment) blocks.push({ head: "💬 Quote of the week", lines: ["\u201C" + r.comment.text + "\u201D", "   ~ " + r.comment.by + " (+" + r.comment.score + ")"] });
+    if (r.ranked && r.ranked.length)
+      blocks.push({ head: "Rankings", lines: r.ranked.map((x, i) => (i + 1) + ". " + x.name + " · " + x.avg.toFixed(1) + " (" + plural(x.n, "rating") + ")") });
+    if (r.comment)
+      blocks.push({ head: "Comment of the week", lines: ["\u201C" + r.comment.text + "\u201D (" + r.comment.by + ", +" + r.comment.score + ")"] });
     const awards = [];
-    if (r.hot) awards.push("🔥 Hottest streak · " + r.hot.name + " (" + r.hot.n + " in a row)");
-    if (r.agreed) awards.push("👍 Most agreed-with · " + r.agreed.name);
-    if (r.harshest) awards.push("🧐 Harshest critic · " + r.harshest.name + " (avg " + r.harshest.avg.toFixed(1) + ")");
-    if (r.easiest) awards.push("🥰 Easiest to please · " + r.easiest.name + " (avg " + r.easiest.avg.toFixed(1) + ")");
-    if (r.contrarian) awards.push("🙃 Contrarian · " + r.contrarian.name);
+    if (r.hot) awards.push("Longest streak: " + r.hot.name + " (" + plural(r.hot.n, "lunch").replace("lunchs", "lunches") + ")");
+    if (r.agreed) awards.push("Most agreed-with: " + r.agreed.name);
+    if (r.harshest) awards.push("Harshest critic: " + r.harshest.name + " (avg " + r.harshest.avg.toFixed(1) + ")");
+    if (r.easiest) awards.push("Easiest to please: " + r.easiest.name + " (avg " + r.easiest.avg.toFixed(1) + ")");
+    if (r.contrarian) awards.push("Contrarian: " + r.contrarian.name);
     const pair = state.ins.taste.closestPair;
-    if (pair) awards.push("👯 Taste twins · " + pair.aReal + " & " + pair.bReal + " (" + similarity(pair.gap) + "% alike)");
-    if (awards.length) blocks.push({ head: "🎖️ This week's awards", lines: awards });
+    if (pair) awards.push("Taste twins: " + pair.aReal + " & " + pair.bReal + " (" + similarity(pair.gap) + "% alike)");
+    if (awards.length) blocks.push({ head: "Awards", lines: awards });
 
-    const stats = "📊 " + r.lunches + " lunch" + (r.lunches === 1 ? "" : "es") + " · " + r.ratings + " rating" + (r.ratings === 1 ? "" : "s") + (r.outCount ? " · " + r.outCount + " out of office" : "");
-    const text = ["🍪 THE WEEKLY CRUMB 🍪", "Lunch recap · " + range, ""]
-      .concat(...blocks.map((b) => [b.head, ...b.lines, ""]))
-      .concat([stats, "👉 Rate lunches here: " + link]).join("\n");
-    const html = "<p><b>🍪 THE WEEKLY CRUMB 🍪</b><br><i>Lunch recap · " + esc(range) + "</i></p>" +
-      blocks.map((b) => "<p><b>" + esc(b.head) + "</b><br>" + b.lines.map((l, i) => b.head.startsWith("💬") && i === 0 ? "<i>" + esc(l) + "</i>" : esc(l)).join("<br>") + "</p>").join("") +
-      "<p>" + esc(stats) + "<br>👉 <a href=\"" + esc(link) + "\">Rate lunches here</a></p>";
+    const stats = plural(r.lunches, "lunch").replace("lunchs", "lunches") + " · " + plural(r.ratings, "rating") + (r.outCount ? " · " + r.outCount + " out of office" : "");
+    const title = "Lunch recap · " + range;
+    const text = [title, ""].concat(...blocks.map((b) => [b.head, ...b.lines, ""])).concat([stats, "Rate lunches: " + link]).join("\n");
+    const html = "<p><b>" + esc(title) + "</b></p>" +
+      blocks.map((b) => "<p><b>" + esc(b.head) + "</b><br>" + b.lines.map(esc).join("<br>") + "</p>").join("") +
+      "<p>" + esc(stats) + "<br><a href=\"" + esc(link) + "\">Rate lunches</a></p>";
     return { text, html };
   }
   $("copyRecap").addEventListener("click", () => {
