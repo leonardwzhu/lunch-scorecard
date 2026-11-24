@@ -156,9 +156,12 @@
         const tied = tiedBest(arr.slice().sort(cmp), (x) => val(x).toFixed(1));
         return Object.assign({}, tied[0], { name: joinNames(tied.map((x) => x.name)), names: tied.map((x) => x.name) });
       };
-      const harshest = pick(qualified, (a, b) => a.avg - b.avg || b.n - a.n, (x) => x.avg);
-      const easiest = pick(qualified, (a, b) => b.avg - a.avg || b.n - a.n, (x) => x.avg);
-      const contrarian = pick(qualified, (a, b) => b.off - a.off || b.n - a.n, (x) => x.off);
+      let harshest = pick(qualified, (a, b) => a.avg - b.avg || b.n - a.n, (x) => x.avg);
+      let easiest = pick(qualified, (a, b) => b.avg - a.avg || b.n - a.n, (x) => x.avg);
+      let contrarian = pick(qualified, (a, b) => b.off - a.off || b.n - a.n, (x) => x.off);
+      // Only hand out these awards when they actually tell people apart.
+      if (harshest && easiest && harshest.avg.toFixed(1) === easiest.avg.toFixed(1)) { harshest = null; easiest = null; }
+      if (contrarian && contrarian.off < 0.05) contrarian = null;
       const agreedAll = [...stats.entries()].map(([p, s]) => ({ name: show(p), score: s.agreed })).filter((x) => x.score > 0).sort((a, b) => b.score - a.score);
       const agreedTied = tiedBest(agreedAll, (x) => x.score);
       const agreed = agreedTied.length ? { name: joinNames(agreedTied.map((x) => x.name)), score: agreedTied[0].score, names: agreedTied.map((x) => x.name) } : null;

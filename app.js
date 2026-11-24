@@ -641,6 +641,19 @@
       ' <span class="trend ' + t.cls + '">' + t.text + "</span></p>";
   }
 
+  // A 1-5 scale: a dot at the average, a faint band from the lowest to the highest rating.
+  // Used on the leaderboard and in the weekly recap so every score reads on the same ruler.
+  function scoreStrip(avgV, lo, hi, tip) {
+    const pos = (x) => ((Math.min(5, Math.max(1, x)) - 1) / 4) * 100;
+    const s = el("span", "strip has-tip"); s.tabIndex = 0; s.dataset.tip = tip;
+    s.setAttribute("role", "img"); s.setAttribute("aria-label", tip.replace(/\n/g, ". "));
+    for (let k = 1; k <= 5; k++) { const t = el("i", "tick"); t.style.left = pos(k) + "%"; s.appendChild(t); }
+    const r = el("i", "range"); r.style.left = pos(lo) + "%"; r.style.width = Math.max(0, pos(hi) - pos(lo)) + "%"; s.appendChild(r);
+    const d = el("i", "dot"); d.style.left = pos(avgV) + "%"; s.appendChild(d);
+    return s;
+  }
+  const spreadOf = (rs) => ({ lo: Math.min(...rs.map((r) => r.stars)), hi: Math.max(...rs.map((r) => r.stars)) });
+
   function renderTally() {
     const body = $("tallyBody");
     if (!state.loaded) return;
@@ -657,7 +670,16 @@
     const counts = [0, 0, 0, 0, 0, 0]; rs.forEach((r) => counts[r.stars]++);
     const max = Math.max(...counts);
     let html = '<div class="tally"><div class="badge">' + cookie(true, { dots: false }) + '<div><span class="num">' + avg(rs).toFixed(1) + '</span><span class="of">OUT OF 5</span></div></div><div class="dist">';
-    for (let i = 5; i >= 1; i--) html += '<div class="row"><span class="lbl">' + i + cookie(true, { dots: false }) + '</span><span class="bar"><i style="width:' + (max ? (counts[i] / max) * 100 : 0) + '%"></i></span><span>' + counts[i] + "</span></div>";
+    const myStars = (myVote(state.day) || {}).stars;
+    const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    for (let i = 5; i >= 1; i--) {
+      const who = rs.filter((r) => r.stars === i).map((r) => (isMe(r.voter_id) ? "You" : (r.voter_name || "A coworker")));
+      const share = Math.round((counts[i] / rs.length) * 100);
+      const tip = LABELS[i] + "\n" + (who.length ? who.join(", ") : "Nobody");
+      html += '<div class="row has-tip' + (i === myStars ? " me" : "") + '" tabindex="0" data-tip="' + esc(tip) + '" aria-label="' + esc(i + " biscuits: " + counts[i] + " (" + share + "%). " + (who.join(", ") || "Nobody")) + '">' +
+        '<span class="lbl">' + i + cookie(true, { dots: false }) + '</span><span class="bar"><i style="width:' + (max ? (counts[i] / max) * 100 : 0) + '%"></i></span>' +
+        '<span class="cnt">' + counts[i] + (counts[i] ? ' <small>' + share + "%</small>" : "") + "</span></div>";
+    }
     const outList = state.absences.filter((a) => a.day === state.day);
     const out = outList.length;
     const outBtn = out ? " · " + namesPop(out + " out of office", "Out of office", outList) : "";
@@ -815,6 +837,9 @@
         if (g.length) sm.textContent += " · " + g.length + " ghost vote" + (g.length > 1 ? "s" : "") + " (" + (g.reduce((t, a) => t + a.ghost, 0) / g.length).toFixed(1) + ")";
       }
       tdD.appendChild(sm);
+      const sp = spreadOf(r.ratings);
+      tdD.appendChild(scoreStrip(r.avg, sp.lo, sp.hi, "Average " + r.avg.toFixed(1) + " · lowest " + sp.lo + " · highest " + sp.hi + "\n" +
+        r.ratings.length + " rating" + (r.ratings.length > 1 ? "s" : "") + (r.days.length > 1 ? " across " + r.days.length + " visits" : "")));
       const tdA = document.createElement("td"); tdA.className = "avg";
       const av = document.createElement("span"); av.textContent = r.avg.toFixed(1); av.appendChild(cookieEl(true, { dots: false }));
       av.setAttribute("aria-label", r.avg.toFixed(1) + " out of 5"); tdA.appendChild(av);
@@ -892,6 +917,18 @@
       if (r.worst) pod.appendChild(card("worst", "Biggest letdown", r.worst));
       body.appendChild(pod);
     }
+    if (r.ranked && r.ranked.length >= 2) { // every lunch of the week on the same 1-5 ruler, in date order
+      const g = el("div", "glance"); g.appendChild(el("span", "eyebrow", "Week at a glance"));
+      const ul = el("ul");
+      r.ranked.slice().sort((a, b) => a.day.localeCompare(b.day)).forEach((x) => {
+        const li = el("li"); const rs2 = ratingsFor(x.day); const sp = spreadOf(rs2);
+        li.append(el("span", "d", pretty(x.day, { weekday: "short" })), el("span", "nm", x.name),
+          scoreStrip(x.avg, sp.lo, sp.hi, x.name + " · " + short(x.day) + "\nAverage " + x.avg.toFixed(1) + " · lowest " + sp.lo + " · highest " + sp.hi + " · " + x.n + " ratings"),
+          el("span", "v", x.avg.toFixed(1)));
+        ul.appendChild(li);
+      });
+      g.appendChild(ul); body.appendChild(g);
+    }
     if (r.comment) {
       const q = el("blockquote", "quote");
       q.append(el("p", null, "\u201C" + r.comment.text + "\u201D"), el("span", null, r.comment.by + " · +" + r.comment.score + " · comment of the week"));
@@ -963,12 +1000,30 @@
   });
 
   const similarity = (gap) => Math.round((1 - gap / 4) * 100);
+  // Four quick figures: how much you've rated, how you rate compared with everyone, your streak.
+  function renderMyNumbers(body) {
+    const mine = state.votes.filter((v) => isMe(v.voter_id) && !isNoLunchDay(v.day));
+    if (!mine.length) return;
+    const seen = state.votes.filter((v) => !resultsHidden(v.day) && !isNoLunchDay(v.day));
+    const myAvg = avg(mine), office = seen.length ? avg(seen) : myAvg;
+    const diff = Math.round((Number(myAvg.toFixed(1)) - Number(office.toFixed(1))) * 10) / 10;
+    const tile = (label, value, note) => { const d = el("div", "tile"); d.append(el("span", "tile-label", label), el("span", "tile-value", value)); if (note) d.appendChild(el("span", "tile-note", note)); return d; };
+    const row = el("div", "tiles");
+    row.append(
+      tile("Lunches rated", String(mine.length)),
+      tile("Your average", myAvg.toFixed(1), diff === 0 ? "Same as the office" : Math.abs(diff).toFixed(1) + (diff > 0 ? " above" : " below") + " the office"),
+      tile("Office average", office.toFixed(1)),
+      tile("Streak", String(state.ins ? state.ins.myStreak : 0), "lunches in a row"));
+    body.appendChild(row);
+  }
+
   function renderTaste() {
     const body = $("tasteBody"), ins = state.ins;
     if (!state.loaded || !ins) return;
     const t = ins.taste;
     body.replaceChildren();
     playOnce(body, (t.twin ? t.twin.name : "") + "|" + t.mine.length);
+    renderMyNumbers(body);
     if (t.twin) {
       const box = el("div", "twin");
       const pair = el("span", "pair"); pair.append(cookieEl(true), cookieEl(true));
@@ -979,8 +1034,10 @@
         const ul = el("ul", "alike");
         t.mine.forEach((m) => {
           const li = el("li"); const bar = el("span", "bar"); const fill = el("i"); fill.style.width = similarity(m.gap) + "%"; bar.appendChild(fill);
-          li.append(el("span", "nm", m.name), bar, el("span", "pct", similarity(m.gap) + "%"));
-          li.title = m.shared + " lunches in common"; ul.appendChild(li);
+          const nm = el("span", "nm", m.name); nm.appendChild(el("small", null, " · " + m.shared));
+          li.append(nm, bar, el("span", "pct", similarity(m.gap) + "%"));
+          if (t.twin.names && t.twin.names.includes(m.name)) li.classList.add("top");
+          li.title = m.shared + " lunches you both rated"; ul.appendChild(li);
         });
         body.appendChild(ul);
       }
@@ -1035,8 +1092,8 @@
   });
 
   document.addEventListener("click", (e) => {
-    const btn = e.target.closest && e.target.closest(".out-count");
-    document.querySelectorAll(".out-count.open").forEach((b) => { if (b !== btn) b.classList.remove("open"); });
+    const btn = e.target.closest && e.target.closest(".out-count, .has-tip");
+    document.querySelectorAll(".out-count.open, .has-tip.open").forEach((b) => { if (b !== btn) b.classList.remove("open"); });
     if (btn) btn.classList.toggle("open");
   });
 
