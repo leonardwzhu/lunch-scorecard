@@ -841,7 +841,7 @@
     state.ins = LunchInsights.build({
       votes: state.votes.filter((v) => workdays(v.day)),
       absences: state.absences.filter((a) => workdays(a.day)),
-      reactions: state.reactions, days, myId: voterId, isMe, today, isHidden: resultsHidden,
+      reactions: state.reactions, days, myId: voterId, myName: $("voterName").value.trim() || store("lunch.name") || "", isMe, today, isHidden: resultsHidden,
     });
   }
 
@@ -864,6 +864,7 @@
 
   function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 
+  const tied = (x) => !!(x && x.names && x.names.length > 1);
   function renderRecap() {
     const body = $("recapBody"), ins = state.ins, monday = state.recapMonday;
     const thisWeek = monday === mondayOf(lunchToday);
@@ -898,10 +899,10 @@
     }
     const awards = [
       r.hot && [r.hot.names.length > 1 ? "Hottest streaks" : "Hottest streak", r.hot.name, "🔥 " + r.hot.n + " lunches in a row"],
-      r.agreed && ["Most agreed-with", r.agreed.name, "+" + r.agreed.score + " from coworkers"],
-      r.harshest && ["Harshest critic", r.harshest.name, "Averaged " + r.harshest.avg.toFixed(1) + " biscuits"],
-      r.easiest && ["Easiest to please", r.easiest.name, "Averaged " + r.easiest.avg.toFixed(1) + " biscuits"],
-      r.contrarian && ["Contrarian", r.contrarian.name, r.contrarian.off.toFixed(1) + " biscuits off the group, on average"],
+      r.agreed && ["Most agreed-with", r.agreed.name, "+" + r.agreed.score + " from coworkers" + (tied(r.agreed) ? " each" : "")],
+      r.harshest && [tied(r.harshest) ? "Harshest critics" : "Harshest critic", r.harshest.name, "Averaged " + r.harshest.avg.toFixed(1) + " biscuits" + (tied(r.harshest) ? " each" : "")],
+      r.easiest && ["Easiest to please", r.easiest.name, "Averaged " + r.easiest.avg.toFixed(1) + " biscuits" + (tied(r.easiest) ? " each" : "")],
+      r.contrarian && [tied(r.contrarian) ? "Contrarians" : "Contrarian", r.contrarian.name, r.contrarian.off.toFixed(1) + " biscuits off the group, on average"],
     ].filter(Boolean);
     if (awards.length) {
       const ul = el("ul", "awards");
@@ -933,11 +934,11 @@
     const awards = [];
     if (r.hot) awards.push("Longest streak: " + r.hot.name + " (" + plural(r.hot.n, "lunch").replace("lunchs", "lunches") + ")");
     if (r.agreed) awards.push("Most agreed-with: " + r.agreed.name);
-    if (r.harshest) awards.push("Harshest critic: " + r.harshest.name + " (avg " + r.harshest.avg.toFixed(1) + ")");
+    if (r.harshest) awards.push((tied(r.harshest) ? "Harshest critics: " : "Harshest critic: ") + r.harshest.name + " (avg " + r.harshest.avg.toFixed(1) + ")");
     if (r.easiest) awards.push("Easiest to please: " + r.easiest.name + " (avg " + r.easiest.avg.toFixed(1) + ")");
-    if (r.contrarian) awards.push("Contrarian: " + r.contrarian.name);
+    if (r.contrarian) awards.push((tied(r.contrarian) ? "Contrarians: " : "Contrarian: ") + r.contrarian.name);
     const pair = state.ins.taste.closestPair;
-    if (pair) awards.push("Taste twins: " + pair.aReal + " & " + pair.bReal + " (" + similarity(pair.gap) + "% alike)");
+    if (pair) awards.push("Taste twins: " + pair.labelReal + " (" + similarity(pair.gap) + "% alike)");
     if (awards.length) blocks.push({ head: "Awards", lines: awards });
 
     const stats = plural(r.lunches, "lunch").replace("lunchs", "lunches") + " · " + plural(r.ratings, "rating") + (r.outCount ? " · " + r.outCount + " out of office" : "");
@@ -971,8 +972,8 @@
     if (t.twin) {
       const box = el("div", "twin");
       const pair = el("span", "pair"); pair.append(cookieEl(true), cookieEl(true));
-      const txt = el("div"); txt.append(el("span", "eyebrow", "Your taste twin"), el("div", "big-name", t.twin.name),
-        el("div", "detail", similarity(t.twin.gap) + "% alike across " + t.twin.shared + " lunches you both rated"));
+      const txt = el("div"); txt.append(el("span", "eyebrow", t.twin.count > 1 ? "Your taste twins (tied)" : "Your taste twin"), el("div", "big-name", t.twin.name),
+        el("div", "detail", t.twin.count > 1 ? similarity(t.twin.gap) + "% alike each" : similarity(t.twin.gap) + "% alike across " + t.twin.shared + " lunches you both rated"));
       box.append(pair, txt); body.appendChild(box);
       if (t.mine.length > 1) {
         const ul = el("ul", "alike");
@@ -983,7 +984,11 @@
         });
         body.appendChild(ul);
       }
-      if (t.opposite && t.opposite.gap > t.twin.gap) body.appendChild(el("p", "empty-note", "Least alike: " + t.opposite.name + ". You two rarely agree."));
+      if (t.opposite) {
+        const pct = similarity(t.opposite.gap);
+        body.appendChild(el("p", "empty-note", "Least alike: " + t.opposite.name + " (" + pct + "% alike" + (t.opposite.count > 1 ? " each" : "") + "). " +
+          (pct >= 75 ? "Even so, you " + (t.opposite.count > 1 ? "all" : "two") + " agree most of the time." : pct >= 50 ? "You often see lunch differently." : "You " + (t.opposite.count > 1 ? "all" : "two") + " rarely agree.")));
+      }
     } else {
       body.appendChild(el("p", "empty-note", t.myRated >= 2
         ? "Nobody has rated the same two lunches as you yet. Check back after a few more lunches."
@@ -991,7 +996,7 @@
     }
     if (t.closestPair) {
       const p = t.closestPair;
-      body.appendChild(el("p", "recap-foot", "Most alike in the office: " + p.a + " & " + p.b + " (" + similarity(p.gap) + "% alike over " + p.shared + " lunches)."));
+      body.appendChild(el("p", "recap-foot", "Most alike in the office: " + p.label + " (" + similarity(p.gap) + "% alike" + (p.count > 1 ? " each" : " over " + p.shared + " lunches") + ")."));
     }
   }
 

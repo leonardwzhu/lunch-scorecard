@@ -9,7 +9,21 @@
     return n ? "n:" + n : "id:" + id;
   }
 
-  function build({ votes, absences, reactions, days, myId, isMe, today, isHidden }) {
+  // Ties list everyone: "Kevin", "Kevin & Julie", "Kevin, Julie & Shea", "Kevin, Julie, Shea + 2 more".
+  function joinNames(names) {
+    if (names.length <= 1) return names[0] || "";
+    if (names.length <= 3) return names.slice(0, -1).join(", ") + " & " + names[names.length - 1];
+    return names.slice(0, 3).join(", ") + " + " + (names.length - 3) + " more";
+  }
+  const similarity = (gap) => Math.round((1 - gap / 4) * 100);
+  // Everyone sharing the best value, comparing what people see on screen (rounded), not hidden decimals.
+  function tiedBest(arr, valueOf) {
+    if (!arr.length) return [];
+    const best = valueOf(arr[0]);
+    return arr.filter((x) => valueOf(x) === best);
+  }
+
+  function build({ votes, absences, reactions, days, myId, myName, isMe, today, isHidden }) {
     const people = new Map();
     const person = (id, name) => {
       const k = personKey(id, name);
@@ -23,7 +37,9 @@
     absences.forEach((a) => { const p = person(a.voter_id, a.voter_name); p.acted.add(a.day); p.out.add(a.day); });
 
     const isMine = isMe || ((id) => id === myId);
-    const me = [...people.values()].find((p) => [...p.ids].some(isMine)) || null;
+    // You're found by this device's ids, or else by the name you go by (a device that hasn't synced yet).
+    const me = [...people.values()].find((p) => [...p.ids].some(isMine)) ||
+      (myName && (myName || "").trim() ? people.get(personKey(null, myName)) : null) || null;
     const display = (p) => (p === me ? "You" : p.name || "Someone without a name");
 
     // Lunch days: any day with a named lunch, a rating or an out-of-office entry. Weekends drop out on their own.
@@ -69,16 +85,35 @@
       });
       mine.sort((x, y) => x.gap - y.gap || y.shared - x.shared);
     }
-    let closestPair = null, furthestPair = null;
+    let furthestPair = null;
     const list = [...people.values()];
     for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
       const c = compare(list[i], list[j]);
       if (!c || c.shared < MIN_SHARED) continue;
       const pair = { a: display(list[i]), b: display(list[j]), aReal: list[i].name || "Someone", bReal: list[j].name || "Someone", ...c };
-      if (!closestPair || c.gap < closestPair.gap || (c.gap === closestPair.gap && c.shared > closestPair.shared)) closestPair = pair;
       if (!furthestPair || c.gap > furthestPair.gap || (c.gap === furthestPair.gap && c.shared > furthestPair.shared)) furthestPair = pair;
     }
-    const taste = { mine, twin: mine[0] || null, opposite: mine.length > 1 ? mine[mine.length - 1] : null, closestPair, furthestPair, myRated: me ? me.ratings.size : 0 };
+    // Your twin(s): everyone tied for the highest similarity; least alike: everyone tied for the lowest.
+    const group = (arr) => arr.length ? { name: joinNames(arr.map((x) => x.name)), names: arr.map((x) => x.name), gap: arr[0].gap, shared: arr[0].shared, count: arr.length } : null;
+    const twins = tiedBest(mine, (x) => similarity(x.gap));
+    const opps = mine.length > 1 ? tiedBest(mine.slice().reverse(), (x) => similarity(x.gap)) : [];
+    // Most alike pair(s) in the office, again keeping ties.
+    const pairs = [];
+    for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
+      const c = compare(list[i], list[j]);
+      if (c && c.shared >= MIN_SHARED) pairs.push({ a: display(list[i]), b: display(list[j]), aReal: list[i].name || "Someone", bReal: list[j].name || "Someone", ...c });
+    }
+    pairs.sort((x, y) => x.gap - y.gap || y.shared - x.shared);
+    const topPairs = tiedBest(pairs, (x) => similarity(x.gap));
+    // One pair reads "You & Kevin"; several read "You & Kevin, Julie & Shea and Emily & andrew" ("You" always first).
+    const pairText = (x, real) => { const a = real ? x.aReal : x.a, b = real ? x.bReal : x.b; return b === "You" ? b + " & " + a : a + " & " + b; };
+    const joinPairs = (ps) => ps.length <= 1 ? ps.join("") : ps.slice(0, -1).join(", ") + " and " + ps[ps.length - 1];
+    const closest = topPairs.length ? Object.assign({}, topPairs[0], {
+      label: joinPairs(topPairs.slice(0, 3).map((x) => pairText(x, false))) + (topPairs.length > 3 ? " + " + (topPairs.length - 3) + " more pairs" : ""),
+      labelReal: joinPairs(topPairs.slice(0, 3).map((x) => pairText(x, true))) + (topPairs.length > 3 ? " + " + (topPairs.length - 3) + " more pairs" : ""),
+      count: topPairs.length }) : null;
+    const opposite = opps.length && twins.length && similarity(opps[0].gap) < similarity(twins[0].gap) ? group(opps) : null;
+    const taste = { mine, twin: group(twins), opposite, closestPair: closest, furthestPair, myRated: me ? me.ratings.size : 0 };
 
     // ---------- weekly recap ----------
     function recap(monday, weekDates, lunchName, forTeams) {
@@ -115,11 +150,18 @@
         stats.set(p, s);
       });
       const qualified = [...stats.entries()].filter(([, s]) => s.n >= 2).map(([p, s]) => ({ name: show(p), n: s.n, avg: s.sum / s.n, off: s.off / s.n }));
-      const pick = (arr, cmp) => (arr.length >= 2 ? arr.slice().sort(cmp)[0] : null);
-      const harshest = pick(qualified, (a, b) => a.avg - b.avg || b.n - a.n);
-      const easiest = pick(qualified, (a, b) => b.avg - a.avg || b.n - a.n);
-      const contrarian = pick(qualified, (a, b) => b.off - a.off || b.n - a.n);
-      const agreed = [...stats.entries()].map(([p, s]) => ({ name: show(p), score: s.agreed })).filter((x) => x.score > 0).sort((a, b) => b.score - a.score)[0] || null;
+      // Awards go to everyone tied for the top spot (compared at the 1 decimal shown).
+      const pick = (arr, cmp, val) => {
+        if (arr.length < 2) return null;
+        const tied = tiedBest(arr.slice().sort(cmp), (x) => val(x).toFixed(1));
+        return Object.assign({}, tied[0], { name: joinNames(tied.map((x) => x.name)), names: tied.map((x) => x.name) });
+      };
+      const harshest = pick(qualified, (a, b) => a.avg - b.avg || b.n - a.n, (x) => x.avg);
+      const easiest = pick(qualified, (a, b) => b.avg - a.avg || b.n - a.n, (x) => x.avg);
+      const contrarian = pick(qualified, (a, b) => b.off - a.off || b.n - a.n, (x) => x.off);
+      const agreedAll = [...stats.entries()].map(([p, s]) => ({ name: show(p), score: s.agreed })).filter((x) => x.score > 0).sort((a, b) => b.score - a.score);
+      const agreedTied = tiedBest(agreedAll, (x) => x.score);
+      const agreed = agreedTied.length ? { name: joinNames(agreedTied.map((x) => x.name)), score: agreedTied[0].score, names: agreedTied.map((x) => x.name) } : null;
 
       // Longest current streak; everyone tied for it shares the award.
       let hot = null;
