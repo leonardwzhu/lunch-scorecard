@@ -307,6 +307,20 @@ textarea { resize: vertical; min-height: 48px; }
 .athome .had { color: var(--muted); font-size: 0.92rem; overflow-wrap: anywhere; }
 .athome .had::before { content: "had "; }
 .athome .pending { color: var(--muted); font-size: 0.85rem; font-style: italic; }
+/* ghost votes: see-through biscuits, clearly separate from real ratings */
+.ghost { display: flex; flex-direction: column; gap: 6px; padding-top: 12px; border-top: 1.5px dashed color-mix(in srgb, var(--caramel) 40%, transparent); }
+.ghost-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.ghost-stars { display: flex; gap: 6px; }
+.ghost-btn { width: 46px; aspect-ratio: 64 / 46; border: none; background: none; padding: 0; cursor: pointer; opacity: 0.38; transition: opacity .15s, transform .15s; }
+.ghost-btn svg { width: 100%; height: 100%; display: block; }
+.ghost-btn.on { opacity: 0.75; }
+.ghost-btn:hover { opacity: 0.85; transform: translateY(-2px) rotate(-4deg); }
+.ghost-note { margin: 0; font-size: 0.8rem; color: var(--muted); }
+.ghostline { margin: 0; padding: 10px 12px; border-radius: 10px; border: 1.5px dashed var(--line); font-size: 0.9rem; color: var(--muted); }
+.ghostline .out-count { color: var(--ink); }
+.ghost-mini { display: inline-flex; gap: 1px; margin-left: 6px; vertical-align: -1px; opacity: 0.5; }
+.ghost-mini svg { width: 15px; height: 11px; }
+.athome .ghostvote { font-size: 0.82rem; color: var(--muted); }
 .reveal .athome li { animation: rise .5s var(--ease-out) both; animation-delay: calc(.4s + var(--i, 0) * 60ms); }
 .react { display: flex; gap: 6px; margin-top: 6px; }
 .react-btn { display: inline-flex; align-items: center; gap: 4px; border: 1.5px solid var(--line); background: transparent; color: var(--muted); border-radius: 999px; padding: 2px 10px 2px 7px; font: 600 0.8rem var(--mono); font-variant-numeric: tabular-nums; cursor: pointer; transition: border-color .15s, background .15s, color .15s; }
@@ -553,7 +567,7 @@ header .text, .hero-side { animation: rise .7s var(--ease-out) both; }
         <p class="auth-title">Welcome! Here's how it works</p>
         <ul class="how">
           <li><strong>Rate the lunch.</strong> Tap 1 to 5 biscuits and write a short review. You can change it any time.</li>
-          <li><strong>Then see the results.</strong> Everyone's ratings stay hidden until you've rated. Missed lunch? Tap <em>I wasn't in the office</em> to see them anyway, and share what you had instead.</li>
+          <li><strong>Then see the results.</strong> Everyone's ratings stay hidden until you've rated. Missed lunch? Tap <em>I wasn't in the office</em> to see them anyway, share what you had instead, and leave a ghost vote for the restaurant (it doesn't count toward the score).</li>
           <li><strong>Agree or disagree.</strong> Use ▲ and ▼ on other people's ratings. The most agreed-with show first.</li>
           <li><strong>Keep your streak going.</strong> Rate every lunch day (<span id="howDays">Monday to Thursday</span>) for a 🔥. Out-of-office days count too.</li>
           <li><strong>Check the weekly recap.</strong> Lunch of the week, awards, and who shares your taste.</li>
@@ -628,6 +642,14 @@ header .text, .hero-side { animation: rise .7s var(--ease-out) both; }
           </div>
           <span class="status" id="ateStatus" role="status"></span>
         </form>
+        <div class="ghost" id="ghostBox" hidden>
+          <span class="eyebrow" id="ghostLabel">Ghost vote</span>
+          <div class="ghost-row">
+            <div class="ghost-stars" id="ghostStars" role="radiogroup" aria-labelledby="ghostLabel"></div>
+            <span class="status" id="ghostStatus" role="status"></span>
+          </div>
+          <p class="ghost-note">Ghost votes show up next to the results but never count toward the score.</p>
+        </div>
       </div>
     </div>
   </section>

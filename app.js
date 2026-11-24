@@ -471,6 +471,43 @@
       $("ateForm").dataset.day = state.day;
     }
     if (!away) delete $("ateForm").dataset.day;
+    renderGhost(away);
+  }
+
+  // ---------- ghost votes: out-of-office people say how much they like the place (never counted) ----------
+  function renderGhost(away) {
+    const box = $("ghostBox");
+    box.hidden = !(away && state.canGhost && canVoteDay());
+    if (box.hidden) return;
+    const lunch = state.days[state.day];
+    $("ghostLabel").textContent = "Ghost vote: how much do you like " + (lunch || "this lunch") + "?";
+    const wrap = $("ghostStars"), cur = away.ghost || 0;
+    wrap.replaceChildren();
+    for (let i = 1; i <= 5; i++) {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "ghost-btn" + (i <= cur ? " on" : "");
+      b.setAttribute("role", "radio"); b.setAttribute("aria-checked", String(i === cur));
+      b.setAttribute("aria-label", "Ghost vote " + i + " biscuit" + (i > 1 ? "s" : ""));
+      b.appendChild(cookieEl(i <= cur, { face: i }));
+      b.addEventListener("click", () => saveGhost(away, i === cur ? null : i));
+      wrap.appendChild(b);
+    }
+  }
+  async function saveGhost(away, value) {
+    const st = $("ghostStatus");
+    const before = away.ghost;
+    away.ghost = value; renderGhost(away); // show it right away
+    st.className = "status"; st.textContent = "Saving…";
+    const { error } = await state.sb.from("absences").update({ ghost: value }).eq("day", away.day).eq("voter_id", away.voter_id);
+    if (error) { away.ghost = before; renderGhost(away); st.className = "status err"; st.textContent = "Didn't save. Try again."; return; }
+    st.className = "status ok"; st.textContent = value ? "Ghost vote saved ✓" : "Ghost vote removed";
+    renderTally(); renderBoard();
+  }
+  const ghostsFor = (day) => state.absences.filter((a) => a.day === day && a.ghost >= 1 && a.ghost <= 5);
+  function ghostMini(n) {
+    const span = el("span", "ghost-mini"); span.setAttribute("aria-label", "ghost vote " + n + " out of 5");
+    for (let k = 1; k <= 5; k++) span.appendChild(cookieEl(k <= n, { dots: false }));
+    return span;
   }
   $("ateForm").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -584,6 +621,18 @@
     if (Math.abs(diff) < 0.05) return { cls: "same", text: "same as before" };
     return diff > 0 ? { cls: "up", text: "↑ " + diff.toFixed(1) } : { cls: "down", text: "↓ " + Math.abs(diff).toFixed(1) };
   }
+  function ghostLine(day) {
+    if (!state.canGhost) return "";
+    const g = ghostsFor(day);
+    if (!g.length) return "";
+    const ga = g.reduce((t, a) => t + a.ghost, 0) / g.length;
+    const attr = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    const lines = g.map((a) => (isMe(a.voter_id) ? "You" : (a.voter_name || "A coworker")) + ": " + a.ghost);
+    const label = g.length + " " + (g.length === 1 ? "person" : "people") + " who were out";
+    return '<p class="ghostline">Ghost votes: <strong>' + ga.toFixed(1) + "</strong> from " +
+      '<button type="button" class="out-count" data-tip="' + attr("Ghost votes:\n" + lines.join("\n")) + '" aria-label="' + attr(label + ": " + lines.join(", ")) + '">' + label + "</button>" +
+      " (not counted)</p>";
+  }
   function lastTimeLine(day, now) {
     const pv = previousVisit(day);
     if (!pv) return "";
@@ -604,7 +653,7 @@
            : "Nobody has rated this lunch yet. Be the first to tap a biscuit above.") + "</p></div></div>";
       return;
     }
-    if (!rs.length) { body.innerHTML = '<p class="empty-note">No ratings for this day yet.' + (canVoteDay() && !myAbsence(state.day) ? " Be the first to tap a biscuit above." : "") + "</p>"; renderAtHome(body); return; }
+    if (!rs.length) { body.innerHTML = '<p class="empty-note">No ratings for this day yet.' + (canVoteDay() && !myAbsence(state.day) ? " Be the first to tap a biscuit above." : "") + "</p>" + ghostLine(state.day); renderAtHome(body); return; }
     const counts = [0, 0, 0, 0, 0, 0]; rs.forEach((r) => counts[r.stars]++);
     const max = Math.max(...counts);
     let html = '<div class="tally"><div class="badge">' + cookie(true, { dots: false }) + '<div><span class="num">' + avg(rs).toFixed(1) + '</span><span class="of">OUT OF 5</span></div></div><div class="dist">';
@@ -614,6 +663,7 @@
     const outBtn = out ? " · " + namesPop(out + " out of office", "Out of office", outList) : "";
     html += '</div><span class="sub">' + namesPop(rs.length + " rating" + (rs.length > 1 ? "s" : ""), "Rated by", rs) + " so far" + outBtn + "</span></div>";
     html += lastTimeLine(state.day, avg(rs));
+    html += ghostLine(state.day);
     html += '<ul class="voters" id="voterList"></ul>';
     body.innerHTML = html;
     if (playOnce(body, state.day + "|open")) countUp(body.querySelector(".badge .num"), avg(rs), 1);
@@ -656,6 +706,7 @@
       const li = el("li"); li.style.setProperty("--i", i);
       const mid = el("div");
       mid.append(el("div", "who", isMe(a.voter_id) ? "You" : (a.voter_name || "A coworker")), el("div", "had", a.ate));
+      if (state.canGhost && a.ghost) { const gv = el("div", "ghostvote", "ghost vote"); gv.appendChild(ghostMini(a.ghost)); mid.appendChild(gv); }
       if (state.oooOn) mid.appendChild(oooVoteRow(a));
       li.append(avatar(a.voter_name, a.voter_id), mid); ul.appendChild(li);
     });
@@ -759,6 +810,10 @@
       if (r.avg < 2.5 && r.ratings.length >= 3) { const p = document.createElement("span"); p.className = "pill bad"; p.textContent = "retire it"; tdD.appendChild(p); }
       const sm = document.createElement("small");
       sm.textContent = (r.days.length > 1 ? "Served " + r.days.length + " times · last " : "Served ") + pretty(last, { month: "short", day: "numeric" }) + " · " + r.ratings.length + " rating" + (r.ratings.length > 1 ? "s" : "");
+      if (state.canGhost) {
+        const g = r.days.flatMap((d) => ghostsFor(d));
+        if (g.length) sm.textContent += " · " + g.length + " ghost vote" + (g.length > 1 ? "s" : "") + " (" + (g.reduce((t, a) => t + a.ghost, 0) / g.length).toFixed(1) + ")";
+      }
       tdD.appendChild(sm);
       const tdA = document.createElement("td"); tdA.className = "avg";
       const av = document.createElement("span"); av.textContent = r.avg.toFixed(1); av.appendChild(cookieEl(true, { dots: false }));
@@ -1093,9 +1148,11 @@
     state.votes = v.data;
     // These tables come from supabase/002_out_of_office_and_rating_votes.sql; the page still works without them.
     let [a, x] = await Promise.all([
-      state.sb.from("absences").select("day, voter_id, voter_name, ate").limit(10000),
+      state.sb.from("absences").select("day, voter_id, voter_name, ate, ghost").limit(10000),
       state.sb.from("rating_votes").select("day, rated_voter_id, voter_id, value").limit(50000),
     ]);
+    state.canGhost = !a.error;
+    if (a.error) a = await state.sb.from("absences").select("day, voter_id, voter_name, ate").limit(10000); // before 007 is run
     state.canShareAte = !a.error;
     if (a.error) a = await state.sb.from("absences").select("day, voter_id, voter_name").limit(10000); // before 005 is run
     state.extras = !a.error && !x.error;
