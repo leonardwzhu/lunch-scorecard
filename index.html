@@ -307,19 +307,22 @@ textarea { resize: vertical; min-height: 48px; }
 .athome .had { color: var(--muted); font-size: 0.92rem; overflow-wrap: anywhere; }
 .athome .had::before { content: "had "; }
 .athome .pending { color: var(--muted); font-size: 0.85rem; font-style: italic; }
-/* ghost votes: see-through biscuits, clearly separate from real ratings */
-.ghost { display: flex; flex-direction: column; gap: 6px; padding-top: 12px; border-top: 1.5px dashed color-mix(in srgb, var(--caramel) 40%, transparent); }
+/* ghost votes: dotted outlines mark them as separate from real ratings */
+.ghost { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border: 2px dotted var(--caramel); border-radius: 14px; background: color-mix(in srgb, var(--card) 70%, transparent); }
 .ghost-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .ghost-stars { display: flex; gap: 6px; }
-.ghost-btn { width: 46px; aspect-ratio: 64 / 46; border: none; background: none; padding: 0; cursor: pointer; opacity: 0.38; transition: opacity .15s, transform .15s; }
-.ghost-btn svg { width: 100%; height: 100%; display: block; }
-.ghost-btn.on { opacity: 0.75; }
-.ghost-btn:hover { opacity: 0.85; transform: translateY(-2px) rotate(-4deg); }
+.ghost-btn { width: 56px; aspect-ratio: 64 / 46; box-sizing: content-box; border: 2px dotted var(--caramel); border-radius: 10px; background: var(--card);
+  padding: 3px; cursor: pointer; transition: transform .15s, border-color .15s, background .15s; }
+.ghost-btn svg { width: 100%; height: 100%; display: block; opacity: 0.85; transition: opacity .15s; }
+.ghost-btn.on { border-style: dashed; border-color: var(--caramel-deep); background: var(--caramel-soft); }
+.ghost-btn.on svg { opacity: 0.9; }
+.ghost-btn:hover { transform: translateY(-2px) rotate(-3deg); border-color: var(--caramel-deep); }
+.ghost-btn:hover svg { opacity: 0.9; }
 .ghost-note { margin: 0; font-size: 0.8rem; color: var(--muted); }
-.ghostline { margin: 0; padding: 10px 12px; border-radius: 10px; border: 1.5px dashed var(--line); font-size: 0.9rem; color: var(--muted); }
+.ghostline { margin: 0; padding: 10px 12px; border-radius: 10px; border: 2px dotted var(--caramel); font-size: 0.9rem; color: var(--ink); }
 .ghostline .out-count { color: var(--ink); }
-.ghost-mini { display: inline-flex; gap: 1px; margin-left: 6px; vertical-align: -1px; opacity: 0.5; }
-.ghost-mini svg { width: 15px; height: 11px; }
+.ghost-mini { display: inline-flex; gap: 1px; margin-left: 6px; vertical-align: -2px; padding: 1px 4px; border: 1.5px dotted var(--caramel); border-radius: 6px; }
+.ghost-mini svg { width: 15px; height: 11px; opacity: 0.7; }
 .athome .ghostvote { font-size: 0.82rem; color: var(--muted); }
 .reveal .athome li { animation: rise .5s var(--ease-out) both; animation-delay: calc(.4s + var(--i, 0) * 60ms); }
 .react { display: flex; gap: 6px; margin-top: 6px; }
