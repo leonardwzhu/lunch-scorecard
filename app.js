@@ -628,10 +628,10 @@
     const ga = g.reduce((t, a) => t + a.ghost, 0) / g.length;
     const attr = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
     const lines = g.map((a) => (isMe(a.voter_id) ? "You" : (a.voter_name || "A coworker")) + ": " + a.ghost);
-    const label = g.length + " " + (g.length === 1 ? "person" : "people") + " who were out";
-    return '<p class="ghostline">Ghost votes: <strong>' + ga.toFixed(1) + "</strong> from " +
+    const label = g.length === 1 ? "1 person who was out" : g.length + " people who were out";
+    return '<p class="ghostline">Ghost votes from ' +
       '<button type="button" class="out-count" data-tip="' + attr("Ghost votes:\n" + lines.join("\n")) + '" aria-label="' + attr(label + ": " + lines.join(", ")) + '">' + label + "</button>" +
-      " (not counted)</p>";
+      ": " + ga.toFixed(1) + " · not counted</p>";
   }
   function lastTimeLine(day, now) {
     const pv = previousVisit(day);
