@@ -763,7 +763,7 @@
       b.dataset.tip = list + (own ? " · You can't vote on your own meal" : "");
       b.setAttribute("aria-label", (val === 1 ? "Upvote " : "Downvote ") + whose + ". " + list);
       b.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="' + (val === 1 ? "M8 3l5 6H3z" : "M8 13L3 7h10z") + '"/></svg>';
-      b.appendChild(el("span", null, String(n)));
+      b.appendChild(el("span", n ? null : "zero", String(n)));
       b.addEventListener("click", () => { if (!off) voteOoo(a, val); });
       row.appendChild(b);
     });
@@ -795,7 +795,7 @@
       b.dataset.tip = list + (own ? " · You can't vote on your own rating" : "");
       b.setAttribute("aria-label", verb + who + ". " + list);
       b.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="' + (val === 1 ? "M8 3l5 6H3z" : "M8 13L3 7h10z") + '"/></svg>';
-      const c = document.createElement("span"); c.textContent = n; b.appendChild(c);
+      const c = document.createElement("span"); c.textContent = n; if (!n) c.className = "zero"; b.appendChild(c);
       b.addEventListener("click", () => { if (!off) react(r.day, r.voter_id, val); });
       row.appendChild(b);
     });
