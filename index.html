@@ -307,6 +307,17 @@ textarea { resize: vertical; min-height: 48px; }
 .athome .had { color: var(--muted); font-size: 0.92rem; overflow-wrap: anywhere; }
 .athome .had::before { content: "had "; }
 .athome .pending { color: var(--muted); font-size: 0.85rem; font-style: italic; }
+/* ---------- question of the day ---------- */
+.qotd { gap: 14px; background: linear-gradient(160deg, var(--card), var(--caramel-soft)); }
+.qotd h2 { font-size: clamp(1.4rem, 3.5vw, 1.9rem); font-weight: 900; color: var(--caramel-deep); }
+.qotd-form { display: flex; flex-direction: column; gap: 8px; }
+.qotd-form input { background: var(--card); }
+.qotd-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.qotd-list li { display: grid; grid-template-columns: 36px 1fr; gap: 10px; align-items: start; padding: 10px 12px; border-radius: 12px; background: var(--card); min-width: 0; }
+.qotd-list .who { font-weight: 700; font-size: 0.9rem; }
+.qotd-list .ans { font-size: 0.92rem; color: var(--ink); overflow-wrap: anywhere; }
+.qotd-list .avatar { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font: 700 0.8rem var(--body); color: #fff; }
+.qotd-empty { margin: 0; color: var(--muted); font-size: 0.9rem; }
 /* ghost votes: dotted outlines mark them as separate from real ratings */
 .ghost { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border: 2px dotted var(--caramel); border-radius: 14px; background: color-mix(in srgb, var(--card) 70%, transparent); }
 .ghost-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -570,6 +581,20 @@ header .text, .hero-side { animation: rise .7s var(--ease-out) both; }
   </header>
 
   <div id="banner" class="banner" hidden></div>
+
+  <section class="card qotd" id="qotdCard" aria-labelledby="qotdQuestion" hidden>
+    <span class="eyebrow">Question of the day</span>
+    <h2 id="qotdQuestion"></h2>
+    <form class="qotd-form" id="qotdForm">
+      <input type="text" id="qotdName" maxlength="40" placeholder="Your name" autocomplete="name" aria-label="Your name" hidden>
+      <div class="editrow">
+        <input type="text" id="qotdInput" maxlength="200" placeholder="Share your answer" autocomplete="off" aria-label="Your answer">
+        <button class="btn primary" type="submit" id="qotdSave">Share</button>
+      </div>
+      <span class="status" id="qotdStatus" role="status"></span>
+    </form>
+    <ul class="qotd-list" id="qotdList"></ul>
+  </section>
 
   <main class="cols">
     <div class="col col-a">

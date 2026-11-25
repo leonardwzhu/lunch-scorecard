@@ -1183,6 +1183,54 @@
   });
   if (state0.linkNote) { $("linkNote").textContent = state0.linkNote; $("linkNote").hidden = false; }
 
+  // ---------- question of the day (config.js → questions; shown on that date only) ----------
+  const QUESTION = (((window.LUNCH_CONFIG || {}).questions) || {})[today] || "";
+  let qotdAnswers = [], qotdOn = false;
+  function renderQotd() {
+    const card = $("qotdCard");
+    card.hidden = !(QUESTION && qotdOn);
+    if (card.hidden) return;
+    $("qotdQuestion").textContent = QUESTION;
+    const mine = qotdAnswers.find((a) => isMe(a.voter_id));
+    const knownName = $("voterName").value.trim() || store("lunch.name") || "";
+    $("qotdName").hidden = !!knownName;
+    if (document.activeElement !== $("qotdInput") && !$("qotdInput").dataset.dirty) $("qotdInput").value = mine ? mine.answer : "";
+    $("qotdSave").textContent = mine ? "Update" : "Share";
+    const list = $("qotdList"); list.replaceChildren();
+    const sorted = qotdAnswers.slice().sort((a, b) => (isMe(b.voter_id) - isMe(a.voter_id)) || String(a.updated_at).localeCompare(String(b.updated_at)));
+    if (!sorted.length) { const p = el("p", "qotd-empty", "No answers yet. Be the first!"); list.appendChild(p); return; }
+    sorted.forEach((a) => {
+      const li = el("li"); const mid = el("div");
+      mid.append(el("div", "who", isMe(a.voter_id) ? "You" : (a.voter_name || "A coworker")), el("div", "ans", a.answer));
+      li.append(avatar(a.voter_name, a.voter_id), mid); list.appendChild(li);
+    });
+  }
+  $("qotdInput").addEventListener("input", () => { $("qotdInput").dataset.dirty = "1"; });
+  $("qotdForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const answer = $("qotdInput").value.trim().slice(0, 200), st = $("qotdStatus");
+    let name = ($("voterName").value.trim() || store("lunch.name") || $("qotdName").value.trim()).slice(0, 40);
+    if (!answer) { st.className = "status err"; st.textContent = "Type an answer first."; return; }
+    if (!name) { st.className = "status err"; st.textContent = "Add your name so people know who answered."; $("qotdName").focus(); return; }
+    if (!$("voterName").value.trim()) { $("voterName").value = name; store("lunch.name", name); }
+    const mine = qotdAnswers.find((a) => isMe(a.voter_id));
+    const row = { day: today, voter_id: mine ? mine.voter_id : voterId, voter_name: name, answer, updated_at: new Date().toISOString() };
+    $("qotdSave").disabled = true; st.className = "status"; st.textContent = "Sharing…";
+    const { error } = await state.sb.from("answers").upsert(row);
+    $("qotdSave").disabled = false;
+    if (error) { st.className = "status err"; st.textContent = "Didn't save. Check your connection and try again."; return; }
+    mergeRow(qotdAnswers, row, ["day", "voter_id"]); delete $("qotdInput").dataset.dirty;
+    st.className = "status ok"; st.textContent = mine ? "Updated ✓" : "Shared ✓";
+    renderQotd();
+  });
+  async function loadQotd() {
+    if (!QUESTION || !state.sb) return;
+    const { data, error } = await state.sb.from("answers").select("day, voter_id, voter_name, answer, updated_at").eq("day", today);
+    qotdOn = !error; // from 008_question_of_the_day.sql
+    qotdAnswers = error ? [] : data;
+    renderQotd();
+  }
+
   // ---------- boot ----------
   paintStars(); render();
 
@@ -1235,6 +1283,7 @@
 
   const timer = setTimeout(() => { if (!state.loaded) banner("Results are taking a while to load. They'll appear as soon as they arrive."); }, 10000);
   loadAll().finally(() => clearTimeout(timer));
+  loadQotd();
 
   // Live updates while the page is open.
   state.sb.channel("lunch")
@@ -1249,6 +1298,9 @@
     })
     .on("postgres_changes", { event: "*", schema: "public", table: "rating_votes" }, (p) => {
       if (p.new && p.new.day) { mergeRow(state.reactions, p.new, ["day", "rated_voter_id", "voter_id"]); renderTally(); }
+    })
+    .on("postgres_changes", { event: "*", schema: "public", table: "answers" }, (p) => {
+      if (p.new && p.new.day === today) { mergeRow(qotdAnswers, p.new, ["day", "voter_id"]); renderQotd(); }
     })
     .on("postgres_changes", { event: "*", schema: "public", table: "days" }, (p) => {
       if (p.new && p.new.day) { state.days[p.new.day] = p.new.lunch; render(); }

@@ -53,6 +53,8 @@ Open the page and use **Copy message** at the bottom to get a ready-to-post mess
 - **New device sync:** a browser that has never voted asks "Voted before on another device?". Typing the name you used links the browser to every rating made under that name (capital letters don't matter). Tapping "I'm new here" shows a short welcome that explains how the app works (anyone can reopen it with "How does this work?" under the rating form). If someone skips that and just votes under a name that's been used before, it syncs automatically, keeping their earlier comment unless they type a new one.
 - **Other devices:** "Use this on another laptop or phone" gives each person a private link. Opening it once on another device makes that device the same person, so their ratings, streak and results show there too. Anything that device rated before still counts as theirs. To look up anyone's link (to send it to them), run [`supabase/personal_links.sql`](supabase/personal_links.sql) in the Supabase SQL Editor.
 
+- **Question of the day:** add a one-off question for a date under `questions` in `config.js` (e.g. `"2026-11-25": "What are your Thanksgiving plans?"`). It shows at the top of the page on that day only, and everyone can answer (run [`supabase/008_question_of_the_day.sql`](supabase/008_question_of_the_day.sql) once).
+
 ## Good to know
 
 - **Votes are tied to a browser, not a login.** Each device counts as a separate person until it's linked with the personal link above, and clearing site data starts a browser over. Anyone with someone's personal link can rate as them. That's fine for a lunch poll, but it isn't secure voting.
