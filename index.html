@@ -318,6 +318,27 @@ textarea { resize: vertical; min-height: 48px; }
 .qotd-list .ans { font-size: 0.92rem; color: var(--ink); overflow-wrap: anywhere; }
 .qotd-list .avatar { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font: 700 0.8rem var(--body); color: #fff; }
 .qotd-empty { margin: 0; color: var(--muted); font-size: 0.9rem; }
+/* ---------- owner tools ---------- */
+.admin { border: 1.5px solid var(--caramel); }
+.admin-form { display: flex; flex-direction: column; gap: 8px; }
+.admin-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.admin-row input { font: inherit; color: var(--ink); background: var(--bg); border: 1.5px solid var(--line); border-radius: 12px; padding: 10px 12px; min-width: 0; }
+.admin-row input:focus { border-color: var(--caramel); outline: none; }
+.admin-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.admin-list li { display: grid; grid-template-columns: 8.5em minmax(0, 1fr) auto; gap: 12px; align-items: baseline; padding: 8px 0; border-bottom: 1px solid color-mix(in srgb, var(--line) 75%, transparent); font-size: 0.92rem; }
+.admin-list li.admin-head { display: block; border: none; padding: 10px 0 2px; font: 500 0.68rem var(--mono); text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+.admin-list li.admin-empty { display: block; border: none; color: var(--muted); }
+.admin-list .qd { font: 600 0.8rem var(--mono); color: var(--muted); }
+.admin-list li.today .qd { color: var(--caramel-deep); }
+.admin-list .qq { overflow-wrap: anywhere; }
+.admin-list li.past { opacity: 0.65; }
+.admin-list .qa { display: flex; gap: 12px; }
+.admin-list .del { color: var(--bad); }
+@media (max-width: 600px) {
+  .admin-row { grid-template-columns: 1fr; }
+  .admin-list li { grid-template-columns: 1fr auto; }
+  .admin-list .qq { grid-column: 1 / -1; grid-row: 2; }
+}
 /* ghost votes: dotted outlines mark them as separate from real ratings */
 .ghost { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border: 2px dotted var(--caramel); border-radius: 14px; background: color-mix(in srgb, var(--card) 70%, transparent); }
 .ghost-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -778,6 +799,23 @@ header .text, .hero-side { animation: rise .7s var(--ease-out) both; }
     </div>
   </section>
   </main>
+
+  <section class="card admin" id="adminCard" aria-labelledby="adminTitle" hidden>
+    <div class="card-head">
+      <h2 id="adminTitle">Questions of the day</h2>
+      <span class="eyebrow">Only you can see this</span>
+    </div>
+    <form class="admin-form" id="qForm">
+      <div class="admin-row">
+        <input type="date" id="qDate" aria-label="Date" required>
+        <input type="text" id="qText" maxlength="200" placeholder="e.g. Best thing you ate over the break?" aria-label="Question" autocomplete="off">
+        <button class="btn primary" type="submit" id="qSave">Save question</button>
+      </div>
+      <span class="status" id="qStatus" role="status"></span>
+    </form>
+    <ul class="admin-list" id="qList"></ul>
+    <button class="linkbtn subtle" id="adminOff" type="button">Hide owner tools on this device</button>
+  </section>
 
   <button class="results-pill" id="resultsPill" type="button" hidden>See what everyone thought ↓</button>
 

@@ -1184,10 +1184,13 @@
   if (state0.linkNote) { $("linkNote").textContent = state0.linkNote; $("linkNote").hidden = false; }
 
   // ---------- question of the day (config.js → questions; shown on that date only) ----------
-  const QUESTION = (((window.LUNCH_CONFIG || {}).questions) || {})[today] || "";
+  const CONFIG_QUESTIONS = ((window.LUNCH_CONFIG || {}).questions) || {};
+  let dbQuestions = {}; // day -> question, from the questions table (009_question_admin.sql)
+  const questionFor = (d) => dbQuestions[d] || CONFIG_QUESTIONS[d] || "";
   let qotdAnswers = [], qotdOn = false;
   function renderQotd() {
     const card = $("qotdCard");
+    const QUESTION = questionFor(today);
     card.hidden = !(QUESTION && qotdOn);
     if (card.hidden) return;
     $("qotdQuestion").textContent = QUESTION;
@@ -1224,12 +1227,76 @@
     renderQotd();
   });
   async function loadQotd() {
-    if (!QUESTION || !state.sb) return;
+    if (!state.sb) return;
+    const q = await state.sb.from("questions").select("day, question");
+    if (!q.error) { dbQuestions = {}; q.data.forEach((r) => { dbQuestions[r.day] = r.question; }); }
+    renderAdmin();
+    if (!questionFor(today)) { renderQotd(); return; }
     const { data, error } = await state.sb.from("answers").select("day, voter_id, voter_name, answer, updated_at").eq("day", today);
     qotdOn = !error; // from 008_question_of_the_day.sql
     qotdAnswers = error ? [] : data;
     renderQotd();
   }
+
+  // ---------- owner tools: add questions of the day (private link: #admin=<key>) ----------
+  let adminToken = store("lunch.adminToken") || "", isAdmin = false, confirmDel = null;
+  (function readAdminLink() {
+    const m = /^#admin=([a-f0-9]{16,128})$/.exec(location.hash);
+    if (!m) return;
+    adminToken = m[1]; store("lunch.adminToken", adminToken);
+    history.replaceState(null, "", location.pathname + location.search); // keep the key out of the address bar
+  })();
+  async function checkAdmin() {
+    if (!adminToken || !state.sb) return;
+    const { data, error } = await state.sb.rpc("is_admin", { token: adminToken });
+    isAdmin = !error && data === true;
+    if (!error && data === false) { store("lunch.adminToken", ""); adminToken = ""; banner("That owner link didn't work. Run supabase/009_question_admin.sql again to see the right one."); }
+    renderAdmin();
+  }
+  function renderAdmin() {
+    const card = $("adminCard");
+    card.hidden = !isAdmin;
+    if (!isAdmin) return;
+    if (!$("qDate").value) $("qDate").value = isNoLunchDay(today) ? stepWorkday(today, 1) : (questionFor(today) ? stepWorkday(today, 1) : today);
+    const list = $("qList"); list.replaceChildren();
+    const days = Object.keys(dbQuestions).sort();
+    const upcoming = days.filter((d) => d >= today), past = days.filter((d) => d < today).slice(-5).reverse();
+    if (!days.length) { list.appendChild(el("li", "admin-empty", "No questions yet. Add one above.")); return; }
+    const row = (d, isPast) => {
+      const li = el("li", isPast ? "past" : (d === today ? "today" : ""));
+      li.append(el("span", "qd", d === today ? "Today" : pretty(d, { weekday: "short", month: "short", day: "numeric" })), el("span", "qq", dbQuestions[d]));
+      const edit = el("button", "linkbtn subtle", "Edit"); edit.type = "button";
+      edit.addEventListener("click", () => { $("qDate").value = d; $("qText").value = dbQuestions[d]; $("qText").focus(); });
+      const del = el("button", "linkbtn subtle del", confirmDel === d ? "Confirm delete" : "Delete"); del.type = "button";
+      del.addEventListener("click", async () => {
+        if (confirmDel !== d) { confirmDel = d; renderAdmin(); return; }
+        confirmDel = null;
+        const { error } = await state.sb.rpc("delete_question", { token: adminToken, d });
+        if (error) { $("qStatus").className = "status err"; $("qStatus").textContent = "Couldn't delete it. Try again."; return; }
+        delete dbQuestions[d]; renderAdmin(); renderQotd();
+        $("qStatus").className = "status ok"; $("qStatus").textContent = "Deleted";
+      });
+      const acts = el("span", "qa"); acts.append(edit, del); li.appendChild(acts);
+      return li;
+    };
+    if (upcoming.length) { list.appendChild(el("li", "admin-head", "Upcoming")); upcoming.forEach((d) => list.appendChild(row(d, false))); }
+    if (past.length) { list.appendChild(el("li", "admin-head", "Recent")); past.forEach((d) => list.appendChild(row(d, true))); }
+  }
+  $("qForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const d = $("qDate").value, q = $("qText").value.trim(), st = $("qStatus");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) { st.className = "status err"; st.textContent = "Pick a date."; return; }
+    if (q.length < 3) { st.className = "status err"; st.textContent = "Type a question (at least 3 characters)."; return; }
+    $("qSave").disabled = true; st.className = "status"; st.textContent = "Saving…";
+    const { error } = await state.sb.rpc("set_question", { token: adminToken, d, q });
+    $("qSave").disabled = false;
+    if (error) { st.className = "status err"; st.textContent = "Couldn't save it. Try again."; return; }
+    dbQuestions[d] = q; $("qText").value = "";
+    st.className = "status ok"; st.textContent = "Saved for " + (d === today ? "today" : pretty(d, { weekday: "long", month: "short", day: "numeric" })) + " ✓";
+    renderAdmin();
+    if (d === today) loadQotd();
+  });
+  $("adminOff").addEventListener("click", () => { store("lunch.adminToken", ""); adminToken = ""; isAdmin = false; renderAdmin(); });
 
   // ---------- boot ----------
   paintStars(); render();
@@ -1283,7 +1350,7 @@
 
   const timer = setTimeout(() => { if (!state.loaded) banner("Results are taking a while to load. They'll appear as soon as they arrive."); }, 10000);
   loadAll().finally(() => clearTimeout(timer));
-  loadQotd();
+  loadQotd().then(checkAdmin);
 
   // Live updates while the page is open.
   state.sb.channel("lunch")
@@ -1299,6 +1366,7 @@
     .on("postgres_changes", { event: "*", schema: "public", table: "rating_votes" }, (p) => {
       if (p.new && p.new.day) { mergeRow(state.reactions, p.new, ["day", "rated_voter_id", "voter_id"]); renderTally(); }
     })
+    .on("postgres_changes", { event: "*", schema: "public", table: "questions" }, () => { loadQotd(); })
     .on("postgres_changes", { event: "*", schema: "public", table: "answers" }, (p) => {
       if (p.new && p.new.day === today) { mergeRow(qotdAnswers, p.new, ["day", "voter_id"]); renderQotd(); }
     })
