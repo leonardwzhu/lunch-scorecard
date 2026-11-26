@@ -307,20 +307,61 @@ textarea { resize: vertical; min-height: 48px; }
 .athome .had { color: var(--muted); font-size: 0.92rem; overflow-wrap: anywhere; }
 .athome .had::before { content: "had "; }
 .athome .pending { color: var(--muted); font-size: 0.85rem; font-style: italic; }
-/* ---------- question of the day ---------- */
-.qotd { gap: 14px; background: linear-gradient(160deg, var(--card), var(--caramel-soft)); }
-.qotd h2 { font-size: clamp(1.4rem, 3.5vw, 1.9rem); font-weight: 900; color: var(--caramel-deep); }
+/* ---------- question of the day: a side tab + drawer ---------- */
+.side-tab { position: fixed; z-index: 30; right: 0; top: 42%; transform: translateY(-50%);
+  writing-mode: vertical-rl; display: flex; align-items: center; gap: 8px;
+  padding: 16px 9px; margin-right: env(safe-area-inset-right, 0px); border: none; border-radius: 12px 0 0 12px;
+  background: var(--caramel-deep); color: var(--card); font: 700 0.82rem var(--body); letter-spacing: 0.04em; cursor: pointer;
+  box-shadow: -4px 6px 18px -8px rgba(80, 40, 10, 0.5); transition: padding .15s, background .15s; }
+.side-tab:hover { padding-right: 13px; }
+.tab-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--wrapper-red); box-shadow: 0 0 0 2px var(--caramel-deep); animation: dot-pulse 1.8s ease-in-out infinite; }
+@keyframes dot-pulse { 50% { box-shadow: 0 0 0 2px var(--caramel-deep), 0 0 0 7px color-mix(in srgb, var(--wrapper-red) 30%, transparent); } }
+.tab-q { writing-mode: horizontal-tb; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--card); color: var(--caramel-deep); font: 900 0.9rem/1 var(--display); }
+/* the peek: a friendly bubble beside the tab, once a day until you answer */
+.q-peek { position: fixed; z-index: 31; right: calc(52px + env(safe-area-inset-right, 0px)); top: 42%; transform: translateY(-50%); width: min(320px, 80vw);
+  background: var(--card); border: 1.5px solid var(--caramel); border-radius: 16px; padding: 16px 18px; box-shadow: 0 18px 40px -16px rgba(70, 35, 10, 0.55);
+  display: flex; flex-direction: column; gap: 8px; animation: peek-in .45s var(--ease-pop, ease) both; }
+.q-peek::after { content: ""; position: absolute; right: -8px; top: 50%; width: 14px; height: 14px; margin-top: -7px; background: var(--card);
+  border-right: 1.5px solid var(--caramel); border-top: 1.5px solid var(--caramel); transform: rotate(45deg); }
+@keyframes peek-in { from { opacity: 0; transform: translate(24px, -50%) scale(.96); } }
+.q-peek-text { margin: 0; font: 800 1.15rem/1.3 var(--display); font-variation-settings: "SOFT" 100; color: var(--ink); padding-right: 18px; }
+.q-peek-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.q-peek-row .btn { padding: 8px 18px; }
+.q-peek-count { font-size: 0.82rem; color: var(--muted); }
+.q-peek-x { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border: none; background: none; color: var(--muted); border-radius: 50%; cursor: pointer; font-size: 0.85rem; }
+.q-peek-x:hover { background: var(--bg); color: var(--ink); }
+@media (max-width: 600px) { /* phones: a card near the bottom instead of a side bubble */
+  .q-peek { top: auto; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); left: max(16px, env(safe-area-inset-left, 0px));
+    width: auto; transform: none; animation-name: peek-up; }
+  .q-peek::after { display: none; }
+  @keyframes peek-up { from { opacity: 0; transform: translateY(24px); } }
+}
+.drawer-backdrop { position: fixed; inset: 0; z-index: 40; background: rgba(30, 15, 5, 0.35); animation: fade .2s ease; }
+.drawer { position: fixed; z-index: 41; top: 0; right: 0; bottom: 0; width: min(440px, 94vw); background: var(--card);
+  box-shadow: -18px 0 40px -20px rgba(40, 20, 5, 0.6); display: flex; flex-direction: column;
+  padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); padding-right: env(safe-area-inset-right, 0px);
+  animation: drawer-in .28s var(--ease-out, ease); }
+@keyframes drawer-in { from { transform: translateX(100%); } }
+.drawer-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px 8px; }
+.drawer-body { overflow-y: auto; padding: 4px 20px 24px; display: flex; flex-direction: column; gap: 22px; }
+.qotd { display: flex; flex-direction: column; gap: 14px; }
+.qotd h2 { font-size: 1.6rem; font-weight: 900; color: var(--caramel-deep); }
 .qotd-form { display: flex; flex-direction: column; gap: 8px; }
-.qotd-form input { background: var(--card); }
-.whocard { gap: 12px; border: 1.5px solid var(--caramel); }
-.whocard h2 { color: var(--caramel-deep); }
-.whocard input { background: var(--bg); }
-.qotd-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
-.qotd-list li { display: grid; grid-template-columns: 36px 1fr; gap: 10px; align-items: start; padding: 10px 12px; border-radius: 12px; background: var(--card); min-width: 0; }
+.qotd-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.qotd-list li { display: grid; grid-template-columns: 36px 1fr; gap: 10px; align-items: start; padding: 10px 12px; border-radius: 12px; background: var(--bg); min-width: 0; }
 .qotd-list .who { font-weight: 700; font-size: 0.9rem; }
 .qotd-list .ans { font-size: 0.92rem; color: var(--ink); overflow-wrap: anywhere; }
 .qotd-list .avatar { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font: 700 0.8rem var(--body); color: #fff; }
 .qotd-empty { margin: 0; color: var(--muted); font-size: 0.9rem; }
+.qpast { display: flex; flex-direction: column; gap: 8px; padding-top: 16px; border-top: 1px solid var(--line); }
+.qpast details { border-radius: 12px; background: var(--bg); padding: 10px 12px; }
+.qpast summary { cursor: pointer; list-style: none; display: flex; flex-direction: column; gap: 2px; }
+.qpast summary::-webkit-details-marker { display: none; }
+.qpast summary .qd { font: 600 0.72rem var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.qpast summary .qq { font-weight: 700; }
+.qpast summary .qn { font-size: 0.8rem; color: var(--muted); }
+.qpast details[open] summary { margin-bottom: 10px; }
+.qpast .qotd-list li { background: var(--card); }
 /* ---------- owner tools ---------- */
 .admin { border: 1.5px solid var(--caramel); }
 .admin-form { display: flex; flex-direction: column; gap: 8px; }
@@ -616,18 +657,44 @@ header .text, .hero-side { animation: rise .7s var(--ease-out) both; }
     <span class="status" id="whoStatus" role="status"></span>
   </section>
 
-  <section class="card qotd" id="qotdCard" aria-labelledby="qotdQuestion" hidden>
+  <!-- Question of the day lives in a side drawer so it never gets in the way of rating lunch -->
+  <button class="side-tab" id="qTab" type="button" aria-controls="qDrawer" aria-expanded="false" hidden>
+    <b class="tab-q" aria-hidden="true">?</b><span>Question of the day</span><i class="tab-dot" id="qTabDot" hidden></i>
+  </button>
+  <div class="q-peek" id="qPeek" role="dialog" aria-labelledby="qPeekText" hidden>
+    <button class="q-peek-x" id="qPeekX" type="button" aria-label="Dismiss">✕</button>
     <span class="eyebrow">Question of the day</span>
-    <h2 id="qotdQuestion"></h2>
-    <form class="qotd-form" id="qotdForm">
-      <div class="editrow">
-        <input type="text" id="qotdInput" maxlength="200" placeholder="Share your answer" autocomplete="off" aria-label="Your answer">
-        <button class="btn primary" type="submit" id="qotdSave">Share</button>
-      </div>
-      <span class="status" id="qotdStatus" role="status"></span>
-    </form>
-    <ul class="qotd-list" id="qotdList"></ul>
-  </section>
+    <p class="q-peek-text" id="qPeekText"></p>
+    <div class="q-peek-row">
+      <button class="btn primary" id="qPeekGo" type="button">Answer</button>
+      <span class="q-peek-count" id="qPeekCount"></span>
+    </div>
+  </div>
+  <div class="drawer-backdrop" id="qBackdrop" hidden></div>
+  <aside class="drawer" id="qDrawer" aria-labelledby="qDrawerTitle" hidden>
+    <div class="drawer-head">
+      <span class="eyebrow" id="qDrawerTitle">Question of the day</span>
+      <button class="iconbtn small drawer-close" id="qClose" type="button" aria-label="Close">✕</button>
+    </div>
+    <div class="drawer-body">
+      <section class="qotd" id="qotdCard" aria-labelledby="qotdQuestion">
+        <h2 id="qotdQuestion"></h2>
+        <form class="qotd-form" id="qotdForm">
+          <div class="editrow">
+            <input type="text" id="qotdInput" maxlength="200" placeholder="Share your answer" autocomplete="off" aria-label="Your answer">
+            <button class="btn primary" type="submit" id="qotdSave">Share</button>
+          </div>
+          <span class="status" id="qotdStatus" role="status"></span>
+        </form>
+        <ul class="qotd-list" id="qotdList"></ul>
+      </section>
+      <p class="qotd-empty" id="qotdNone" hidden>No question today.</p>
+      <section class="qpast" id="qPast" hidden>
+        <span class="eyebrow">Earlier questions</span>
+        <div id="qPastList"></div>
+      </section>
+    </div>
+  </aside>
 
   <main class="cols">
     <div class="col col-a">
