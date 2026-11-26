@@ -1196,7 +1196,7 @@
     $("qotdQuestion").textContent = QUESTION;
     const mine = qotdAnswers.find((a) => isMe(a.voter_id));
     const knownName = $("voterName").value.trim() || store("lunch.name") || "";
-    $("qotdName").hidden = !!knownName;
+    $("qotdNameBox").hidden = !!knownName;
     if (document.activeElement !== $("qotdInput") && !$("qotdInput").dataset.dirty) $("qotdInput").value = mine ? mine.answer : "";
     $("qotdSave").textContent = mine ? "Update" : "Share";
     const list = $("qotdList"); list.replaceChildren();
@@ -1215,7 +1215,15 @@
     let name = ($("voterName").value.trim() || store("lunch.name") || $("qotdName").value.trim()).slice(0, 40);
     if (!answer) { st.className = "status err"; st.textContent = "Type an answer first."; return; }
     if (!name) { st.className = "status err"; st.textContent = "Add your name so people know who answered."; $("qotdName").focus(); return; }
-    if (!$("voterName").value.trim()) { $("voterName").value = name; store("lunch.name", name); }
+    if (!$("voterName").value.trim()) {
+      // A name someone already rates with links this browser to them, the same as on the rating form.
+      if (autoSyncByName(name)) {
+        const known = state.votes.find((v) => isMe(v.voter_id) && v.voter_name);
+        if (known) name = known.voter_name.trim();
+      }
+      $("voterName").value = name; store("lunch.name", name);
+      loadMyVoteIntoForm(); render();
+    }
     const mine = qotdAnswers.find((a) => isMe(a.voter_id));
     const row = { day: today, voter_id: mine ? mine.voter_id : voterId, voter_name: name, answer, updated_at: new Date().toISOString() };
     $("qotdSave").disabled = true; st.className = "status"; st.textContent = "Sharing…";
