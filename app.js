@@ -1213,10 +1213,20 @@
   });
   if (state0.linkNote) { $("linkNote").textContent = state0.linkNote; $("linkNote").hidden = false; }
 
-  // ---------- question of the day (config.js → questions; shown on that date only) ----------
+  // ---------- question of the week (config.js → questions, or the owner panel) ----------
+  // A question is stored under a date and runs for that whole Monday–Sunday week.
+  // New ones are saved under the week's Monday; answers are stored under the question's own date.
   const CONFIG_QUESTIONS = ((window.LUNCH_CONFIG || {}).questions) || {};
-  let dbQuestions = {}; // day -> question, from the questions table (009_question_admin.sql)
+  let dbQuestions = {}; // date -> question, from the questions table (009_question_admin.sql)
   const questionFor = (d) => dbQuestions[d] || CONFIG_QUESTIONS[d] || "";
+  const allQuestionDays = () => [...new Set([...Object.keys(dbQuestions), ...Object.keys(CONFIG_QUESTIONS)])].filter((d) => questionFor(d)).sort();
+  function weekKey(d) { // the stored date of the question running in d's week ("" if none)
+    const mon = mondayOf(d), inWeek = allQuestionDays().filter((k) => mondayOf(k) === mon);
+    if (!inWeek.length) return "";
+    if (inWeek.includes(mon)) return mon;
+    return inWeek.filter((k) => k <= d).pop() || inWeek[0];
+  }
+  const weekLabel = (d) => "Week of " + pretty(mondayOf(d), { month: "short", day: "numeric" });
   let qotdAnswers = [], qotdOn = false;
   function answerList(list, rows, emptyText) {
     list.replaceChildren();
@@ -1229,14 +1239,14 @@
     });
   }
   function renderQotd() {
-    const QUESTION = questionFor(today);
-    const pastDays = [...new Set([...Object.keys(dbQuestions), ...Object.keys(CONFIG_QUESTIONS)])].filter((d) => d < today).sort().reverse();
+    const KEY = weekKey(today), QUESTION = KEY ? questionFor(KEY) : "";
+    const pastDays = allQuestionDays().filter((d) => d !== KEY && d <= today).reverse();
     // The tab only shows when there's something to see (and answers are set up).
     $("qTab").hidden = !(qotdOn && (QUESTION || pastDays.length));
-    const todays = qotdAnswers.filter((a) => a.day === today);
+    const todays = KEY ? qotdAnswers.filter((a) => a.day === KEY) : [];
     const mine = todays.find((a) => isMe(a.voter_id));
     $("qTabDot").hidden = !(QUESTION && !mine);
-    $("qTab").setAttribute("aria-label", "Question of the day" + (QUESTION && !mine ? " (not answered yet)" : ""));
+    $("qTab").setAttribute("aria-label", "Question of the week" + (QUESTION && !mine ? " (not answered yet)" : ""));
     $("qotdCard").hidden = !QUESTION; $("qotdNone").hidden = !!QUESTION;
     if (QUESTION) {
       $("qotdQuestion").textContent = QUESTION;
@@ -1251,15 +1261,15 @@
       const rows = qotdAnswers.filter((a) => a.day === d);
       const det = document.createElement("details"); det.dataset.day = d; if (open.has(d)) det.open = true;
       const sum = document.createElement("summary");
-      sum.append(el("span", "qd", pretty(d, { weekday: "short", month: "short", day: "numeric" })), el("span", "qq", questionFor(d)),
+      sum.append(el("span", "qd", weekLabel(d)), el("span", "qq", questionFor(d)),
         el("span", "qn", rows.length + " answer" + (rows.length === 1 ? "" : "s")));
       const ul = el("ul", "qotd-list"); answerList(ul, rows, "Nobody answered this one.");
       det.append(sum, ul); past.appendChild(det);
     });
   }
-  function nudgePeek() { // after rating lunch: give the tab a little wiggle if today's question is still unanswered
-    const QUESTION = questionFor(today);
-    if (!QUESTION || !qotdOn || qotdAnswers.some((a) => a.day === today && isMe(a.voter_id))) return;
+  function nudgePeek() { // after rating lunch: give the tab a little wiggle if this week's question is still unanswered
+    const KEY = weekKey(today);
+    if (!KEY || !qotdOn || qotdAnswers.some((a) => a.day === KEY && isMe(a.voter_id))) return;
     const tab = $("qTab"); tab.classList.remove("nudge"); void tab.offsetWidth;
     if (!matchMedia("(prefers-reduced-motion: reduce)").matches) tab.classList.add("nudge");
   }
@@ -1281,8 +1291,9 @@
     const name = knownName().slice(0, 40);
     if (!answer) { st.className = "status err"; st.textContent = "Type an answer first."; return; }
     if (!name) { st.className = "status"; st.textContent = ""; openDrawer(false); askWho("Tell us your name first, then come back to share your answer."); return; }
-    const mine = qotdAnswers.find((a) => a.day === today && isMe(a.voter_id));
-    const row = { day: today, voter_id: mine ? mine.voter_id : voterId, voter_name: name, answer, updated_at: new Date().toISOString() };
+    const KEY = weekKey(today); if (!KEY) return;
+    const mine = qotdAnswers.find((a) => a.day === KEY && isMe(a.voter_id));
+    const row = { day: KEY, voter_id: mine ? mine.voter_id : voterId, voter_name: name, answer, updated_at: new Date().toISOString() };
     $("qotdSave").disabled = true; st.className = "status"; st.textContent = "Sharing…";
     const { error } = await state.sb.from("answers").upsert(row);
     $("qotdSave").disabled = false;
@@ -1302,7 +1313,7 @@
     renderQotd();
   }
 
-  // ---------- owner tools: add questions of the day (private link: #admin=<key>) ----------
+  // ---------- owner tools: add questions of the week (private link: #admin=<key>) ----------
   let adminToken = store("lunch.adminToken") || "", isAdmin = false, confirmDel = null;
   (function readAdminLink() {
     const m = /^#admin=([a-f0-9]{16,128})$/.exec(location.hash);
@@ -1321,14 +1332,16 @@
     const card = $("adminCard");
     card.hidden = !isAdmin;
     if (!isAdmin) return;
-    if (!$("qDate").value) $("qDate").value = isNoLunchDay(today) ? stepWorkday(today, 1) : (questionFor(today) ? stepWorkday(today, 1) : today);
+    const thisMon = mondayOf(today);
+    if (!$("qDate").value) $("qDate").value = weekKey(today) ? shift(thisMon, 7) : thisMon; // next free week
     const list = $("qList"); list.replaceChildren();
     const days = Object.keys(dbQuestions).sort();
-    const upcoming = days.filter((d) => d >= today), past = days.filter((d) => d < today).slice(-5).reverse();
+    const upcoming = days.filter((d) => mondayOf(d) >= thisMon), past = days.filter((d) => mondayOf(d) < thisMon).slice(-5).reverse();
     if (!days.length) { list.appendChild(el("li", "admin-empty", "No questions yet. Add one above.")); return; }
     const row = (d, isPast) => {
-      const li = el("li", isPast ? "past" : (d === today ? "today" : ""));
-      li.append(el("span", "qd", d === today ? "Today" : pretty(d, { weekday: "short", month: "short", day: "numeric" })), el("span", "qq", dbQuestions[d]));
+      const now = mondayOf(d) === thisMon;
+      const li = el("li", isPast ? "past" : (now ? "today" : ""));
+      li.append(el("span", "qd", now ? "This week" : weekLabel(d)), el("span", "qq", dbQuestions[d]));
       const edit = el("button", "linkbtn subtle", "Edit"); edit.type = "button";
       edit.addEventListener("click", () => { $("qDate").value = d; $("qText").value = dbQuestions[d]; $("qText").focus(); });
       const del = el("button", "linkbtn subtle del", confirmDel === d ? "Confirm delete" : "Delete"); del.type = "button";
@@ -1348,17 +1361,19 @@
   }
   $("qForm").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const d = $("qDate").value, q = $("qText").value.trim(), st = $("qStatus");
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) { st.className = "status err"; st.textContent = "Pick a date."; return; }
+    const picked = $("qDate").value, q = $("qText").value.trim(), st = $("qStatus");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(picked)) { st.className = "status err"; st.textContent = "Pick a week."; return; }
+    // Any day picked means its whole week; reuse that week's existing entry so editing replaces it.
+    const existing = Object.keys(dbQuestions).filter((k) => mondayOf(k) === mondayOf(picked));
+    const d = existing.includes(mondayOf(picked)) ? mondayOf(picked) : (existing[0] || mondayOf(picked));
     if (q.length < 3) { st.className = "status err"; st.textContent = "Type a question (at least 3 characters)."; return; }
     $("qSave").disabled = true; st.className = "status"; st.textContent = "Saving…";
     const { error } = await state.sb.rpc("set_question", { token: adminToken, d, q });
     $("qSave").disabled = false;
     if (error) { st.className = "status err"; st.textContent = "Couldn't save it. Try again."; return; }
-    dbQuestions[d] = q; $("qText").value = "";
-    st.className = "status ok"; st.textContent = "Saved for " + (d === today ? "today" : pretty(d, { weekday: "long", month: "short", day: "numeric" })) + " ✓";
-    renderAdmin();
-    if (d === today) loadQotd();
+    dbQuestions[d] = q; $("qText").value = ""; $("qDate").value = d;
+    st.className = "status ok"; st.textContent = "Saved for " + (mondayOf(d) === mondayOf(today) ? "this week" : "the week of " + pretty(mondayOf(d), { month: "short", day: "numeric" })) + " ✓";
+    renderAdmin(); renderQotd();
   });
   $("adminOff").addEventListener("click", () => { store("lunch.adminToken", ""); adminToken = ""; isAdmin = false; renderAdmin(); });
 

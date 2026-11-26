@@ -6,7 +6,8 @@ window.LUNCH_CONFIG = {
   supabaseAnonKey: "sb_publishable_g31h0mZLxL3KKgZuYPnDTQ_8QE_9n4d",
   teamName: "",                // optional, shown in the Teams message, e.g. "the design team"
   lunchWeekdays: [1, 2, 3, 4], // days with an office lunch: 1 = Monday, 2 = Tuesday, 3 = Wednesday, 4 = Thursday, 5 = Friday
-  // One-off questions shown at the top of the page on that day only ("YYYY-MM-DD": "question").
+  // Question of the week: "YYYY-MM-DD": "question" runs for that date's whole Monday–Sunday week.
+  // (Easier: add them from the private owner panel instead.)
   questions: {
     "2026-11-25": "What are your Thanksgiving plans? 🦃",
   },
