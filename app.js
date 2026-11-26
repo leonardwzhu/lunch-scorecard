@@ -1236,8 +1236,7 @@
     const todays = qotdAnswers.filter((a) => a.day === today);
     const mine = todays.find((a) => isMe(a.voter_id));
     $("qTabDot").hidden = !(QUESTION && !mine);
-    renderPeek(QUESTION, mine, todays);
-    $("qTab").setAttribute("aria-label", "Question of the day" + (QUESTION && !mine ? " (not answered yet)" : ""));
+    renderStrip(QUESTION, mine, todays, pastDays);
     $("qotdCard").hidden = !QUESTION; $("qotdNone").hidden = !!QUESTION;
     if (QUESTION) {
       $("qotdQuestion").textContent = QUESTION;
@@ -1258,27 +1257,27 @@
       det.append(sum, ul); past.appendChild(det);
     });
   }
-  // The peek: shows the question itself beside the tab, once a day until you answer or dismiss it.
-  let peekTimer = null;
-  function renderPeek(QUESTION, mine, todays) {
-    const show = QUESTION && !mine && qotdOn && $("qDrawer").hidden && store("lunch.qPeekDismissed") !== today;
-    if (!show) { $("qPeek").hidden = true; return; }
-    $("qPeekText").textContent = QUESTION;
-    const others = todays.filter((a) => !isMe(a.voter_id)).length;
-    $("qPeekCount").textContent = others ? others + (others === 1 ? " coworker has" : " coworkers have") + " answered" : "Be the first to answer";
-    if ($("qPeek").hidden && !peekTimer) peekTimer = setTimeout(() => { peekTimer = null; if (!$("qDrawer").hidden) return; $("qPeek").hidden = false; }, 1200);
+  // The strip above the cards: the question itself, who's answered, and one clear button.
+  function renderStrip(QUESTION, mine, todays, pastDays) {
+    const strip = $("qTab"), others = todays.filter((a) => !isMe(a.voter_id));
+    strip.classList.toggle("done", !QUESTION || !!mine);
+    $("qsLabel").textContent = QUESTION ? (mine ? "You answered today's question" : "Question of the day") : "No question today";
+    $("qsQ").textContent = QUESTION ? (mine ? "\u201c" + mine.answer + "\u201d" : QUESTION) : pastDays.length + " earlier question" + (pastDays.length === 1 ? "" : "s");
+    const faces = $("qsFaces"); faces.replaceChildren(); others.slice(-4).forEach((a) => faces.appendChild(avatar(a.voter_name, a.voter_id)));
+    $("qsCount").textContent = !QUESTION ? "" : others.length ? others.length + (others.length === 1 ? " answer" : " answers") + (mine ? " from coworkers" : " so far") : mine ? "" : "Be the first";
+    $("qsGo").textContent = !QUESTION ? "Browse \u2192" : mine ? "See all \u2192" : "Answer";
+    strip.setAttribute("aria-label", QUESTION ? (mine ? "See everyone's answers to today's question" : "Answer today's question: " + QUESTION) : "Browse earlier questions");
   }
-  function nudgePeek() { // after rating lunch: a good moment to ask
-    store("lunch.qPeekDismissed", "");
-    const QUESTION = questionFor(today), todays = qotdAnswers.filter((a) => a.day === today);
-    if (QUESTION && qotdOn && !todays.some((a) => isMe(a.voter_id))) { $("qPeek").hidden = true; renderPeek(QUESTION, null, todays); }
+  function nudgePeek() { // after rating lunch: give the strip a little wiggle if the question is still unanswered
+    const QUESTION = questionFor(today);
+    if (!QUESTION || !qotdOn || qotdAnswers.some((a) => a.day === today && isMe(a.voter_id))) return;
+    const strip = $("qTab"); strip.classList.remove("nudge"); void strip.offsetWidth;
+    if (!matchMedia("(prefers-reduced-motion: reduce)").matches) strip.classList.add("nudge");
+    $("qsLabel").textContent = "Thanks for rating! One more thing\u2026";
   }
-  $("qPeekGo").addEventListener("click", () => { $("qPeek").hidden = true; openDrawer(true); });
-  $("qPeekX").addEventListener("click", () => { $("qPeek").hidden = true; store("lunch.qPeekDismissed", today); });
 
   function openDrawer(open) {
     $("qDrawer").hidden = !open; $("qBackdrop").hidden = !open;
-    if (open) { $("qPeek").hidden = true; clearTimeout(peekTimer); peekTimer = null; }
     $("qTab").setAttribute("aria-expanded", String(open));
     if (open) { renderQotd(); setTimeout(() => ($("qotdCard").hidden ? $("qClose") : $("qotdInput")).focus({ preventScroll: true }), 50); }
     else $("qTab").focus({ preventScroll: true });
