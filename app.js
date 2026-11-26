@@ -180,11 +180,11 @@
 
   // Known name shows as "Rating as Kevin · Change" instead of a text box. The box only shrinks on load or
   // after a save, never while you're mid-way through, so the biscuits don't jump out from under your finger.
-  let editingName = !(store("lunch.name") || "").trim();
+  let editingName = false;
   function renderName() {
     const name = $("voterName").value.trim();
     const chip = !!name && !editingName;
-    $("nameField").hidden = chip; $("nameChip").hidden = !chip;
+    $("nameField").hidden = !editingName; $("nameChip").hidden = !chip; // no name yet: the "Who's this?" card asks
     if (chip) $("nameChipText").textContent = name;
   }
   $("nameChange").addEventListener("click", () => { editingName = true; renderName(); $("voterName").focus(); $("voterName").select(); });
@@ -382,6 +382,7 @@
     saveTimer = null;
     if (saving) { savePending = true; return; }
     if (!state.pick || !state.sb || !canVoteDay()) return;
+    if (!knownName()) { askWho("Tell us your name first, then save your rating."); return; }
     if ($("comment").value.trim().length < MIN_REVIEW) { updateSubmit(); $("comment").focus(); return; }
     const firstToday = !myVote(state.day);
     const synced = autoSyncByName($("voterName").value);
@@ -440,6 +441,7 @@
   $("awayNo").addEventListener("click", () => { state.confirmingAway = false; renderAway(); });
   $("awayYes").addEventListener("click", async () => {
     if (!state.sb) return;
+    if (!knownName()) { askWho("Tell us your name first, then mark yourself out."); return; }
     autoSyncByName($("voterName").value);
     if (myVote(state.day) || myAbsence(state.day)) { state.confirmingAway = false; render(); return; }
     $("awayYes").disabled = true;
@@ -1129,9 +1131,37 @@
   }
 
   function renderSync() {
-    const known = state.votes.length || state.absences.length;
-    $("syncBox").hidden = !(state.loaded && state.sb && known && !hasHistory() && store("lunch.syncDone") !== "1");
+    $("syncBox").hidden = true; // replaced by the single "Who's this?" card
+    renderWho();
   }
+
+  // ---------- "Who's this?": the one place a new browser gives its name ----------
+  const knownName = () => $("voterName").value.trim() || (store("lunch.name") || "").trim();
+  function renderWho() {
+    $("whoBox").hidden = !(state.loaded && state.sb && !knownName());
+  }
+  function askWho(msg) {
+    renderWho();
+    const st = $("whoStatus"); st.className = "status err"; st.textContent = msg || "";
+    $("whoBox").scrollIntoView({ block: "center", behavior: calm() ? "auto" : "smooth" });
+    $("whoName").focus({ preventScroll: true });
+  }
+  $("whoForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    let name = $("whoName").value.trim().slice(0, 40);
+    if (!name) { $("whoStatus").className = "status err"; $("whoStatus").textContent = "Type your name to continue."; return; }
+    const ids = hasHistory() ? [] : idsForName(name);
+    if (ids.length && !ids.some(isMe)) { // someone already rates with this name: this browser becomes them
+      const named = [...state.votes, ...state.absences].find((r) => ids.includes(r.voter_id) && r.voter_name);
+      if (named) name = named.voter_name.trim();
+      syncTo(name, ids);
+    } else {
+      showWelcome(true); // a new face: show how it works
+    }
+    $("voterName").value = name; store("lunch.name", name); store("lunch.syncDone", "1");
+    $("whoStatus").textContent = ""; $("whoBox").hidden = true;
+    loadMyVoteIntoForm(); render(); renderQotd();
+  });
   $("syncForm").addEventListener("submit", (e) => {
     e.preventDefault();
     const name = $("syncName").value.trim(), st = $("syncStatus");
@@ -1195,8 +1225,7 @@
     if (card.hidden) return;
     $("qotdQuestion").textContent = QUESTION;
     const mine = qotdAnswers.find((a) => isMe(a.voter_id));
-    const knownName = $("voterName").value.trim() || store("lunch.name") || "";
-    $("qotdNameBox").hidden = !!knownName;
+
     if (document.activeElement !== $("qotdInput") && !$("qotdInput").dataset.dirty) $("qotdInput").value = mine ? mine.answer : "";
     $("qotdSave").textContent = mine ? "Update" : "Share";
     const list = $("qotdList"); list.replaceChildren();
@@ -1212,18 +1241,9 @@
   $("qotdForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const answer = $("qotdInput").value.trim().slice(0, 200), st = $("qotdStatus");
-    let name = ($("voterName").value.trim() || store("lunch.name") || $("qotdName").value.trim()).slice(0, 40);
+    const name = knownName().slice(0, 40);
     if (!answer) { st.className = "status err"; st.textContent = "Type an answer first."; return; }
-    if (!name) { st.className = "status err"; st.textContent = "Add your name so people know who answered."; $("qotdName").focus(); return; }
-    if (!$("voterName").value.trim()) {
-      // A name someone already rates with links this browser to them, the same as on the rating form.
-      if (autoSyncByName(name)) {
-        const known = state.votes.find((v) => isMe(v.voter_id) && v.voter_name);
-        if (known) name = known.voter_name.trim();
-      }
-      $("voterName").value = name; store("lunch.name", name);
-      loadMyVoteIntoForm(); render();
-    }
+    if (!name) { st.className = "status"; st.textContent = ""; askWho("Tell us your name first, then share your answer."); return; }
     const mine = qotdAnswers.find((a) => isMe(a.voter_id));
     const row = { day: today, voter_id: mine ? mine.voter_id : voterId, voter_name: name, answer, updated_at: new Date().toISOString() };
     $("qotdSave").disabled = true; st.className = "status"; st.textContent = "Sharing…";
